@@ -210,7 +210,7 @@ describe("watchSync", function() {
       });
     });
 
-    it("works from another directory with cwd option", function(done) {
+    it("handles file adds from another directory with cwd option", function(done) {
       var otherDir = path.join(tempRoot, "other");
       fs.mkdirSync(otherDir);
       process.chdir(otherDir);
@@ -220,6 +220,22 @@ describe("watchSync", function() {
         var destFile = path.join(destDir, "test.txt");
         fs.statSync(destFile);
         expect(fs.readFileSync(destFile, "utf8")).equals(content);
+        done();
+      });
+    });
+
+    it("handles file deletes from another directory with cwd option", function(done) {
+      var otherDir = path.join(tempRoot, "other");
+      fs.mkdirSync(otherDir);
+      process.chdir(otherDir);
+      // Add file to otherDir (current dir) and destDir, but not to srcDir. This should
+      // cause the watcher to remove the file from destDir.
+      fs.writeFileSync(path.join(otherDir, "test.txt"), content, "utf8");
+      fs.writeFileSync(path.join(destDir, "test.txt"), content, "utf8");
+      watcher = watchSync.sync(".", destDir, { cwd: srcDir, delete: true });
+      watcher.on("ready", function() {
+        var destFile = path.join(destDir, "test.txt");
+        expect(function() { fs.statSync(destFile); }).to.throw(Error);
         done();
       });
     });
