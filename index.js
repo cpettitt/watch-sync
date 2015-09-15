@@ -35,10 +35,6 @@ var _fsExtra = require("fs-extra");
 
 var _fsExtra2 = _interopRequireDefault(_fsExtra);
 
-var _globParent = require("glob-parent");
-
-var _globParent2 = _interopRequireDefault(_globParent);
-
 var _pathIsAbsolute = require("path-is-absolute");
 
 var _pathIsAbsolute2 = _interopRequireDefault(_pathIsAbsolute);
@@ -55,7 +51,8 @@ var _lodashObjectPick2 = _interopRequireDefault(_lodashObjectPick);
 var version = JSON.parse(_fsExtra2["default"].readFileSync(_path2["default"].join(__dirname, "package.json"))).version;
 
 var DEFAULT_OPTS = {
-  preserveTimestamps: "all"
+  preserveTimestamps: "all",
+  "delete": false
 };
 
 var FSSyncer = (function (_EventEmitter) {
@@ -77,6 +74,11 @@ var FSSyncer = (function (_EventEmitter) {
     this._dest = dest;
 
     this._preserveTimestamps = opts.preserveTimestamps;
+
+    this._delete = opts["delete"];
+    if (this._delete) {
+      this._visited = new Set();
+    }
 
     if (!dest) {
       throw new Error("A destination must be specified!");
@@ -100,6 +102,12 @@ var FSSyncer = (function (_EventEmitter) {
   }, {
     key: "_handleReady",
     value: function _handleReady() {
+      // If we were tracking visited files before the "ready" event then we
+      // have the delete option enabled. Time to visit the destination and
+      // ensure we remove everything not visited. We do this synchronously
+      // to ensure we're in a consistent state when we get subsequent updates
+      // from Chokidar.
+      this._deleteUnvisitedFiles();
       this.emit("ready");
     }
   }, {
@@ -142,6 +150,36 @@ var FSSyncer = (function (_EventEmitter) {
 
       this.emit(event, filePath, destPath, stat);
       this.emit("all", event, filePath, destPath, stat);
+    }
+  }, {
+    key: "_deleteUnvisitedFiles",
+    value: function _deleteUnvisitedFiles() {
+      var _this2 = this;
+
+      if (!this._visited || !this._delete) {
+        delete this._visited;
+        return;
+      }
+
+      var visitStack = _fsExtra2["default"].readdirSync(this._dest);
+
+      var _loop = function () {
+        var f = visitStack.pop();
+        if (!_this2._visited.has(f)) {
+          // We did not visit this file so delete it.
+          _fsExtra2["default"].removeSync(_path2["default"].join(_this2._dest, f));
+        } else if (_fsExtra2["default"].statSync(f).isDirectory()) {
+          _fsExtra2["default"].readdirSync(f).forEach(function (subfile) {
+            return visitStack.push(_path2["default"].join(f, subfile));
+          });
+        }
+      };
+
+      while (visitStack.length) {
+        _loop();
+      }
+
+      delete this._visited;
     }
   }]);
 

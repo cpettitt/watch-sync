@@ -8,7 +8,6 @@ import { EventEmitter } from "events";
 import chokidar from "chokidar";
 import defaults from "lodash/object/defaults";
 import fs from "fs-extra";
-import globParent from "glob-parent";
 import isAbsolute from "path-is-absolute";
 import path from "path";
 import pick from "lodash/object/pick";
@@ -17,7 +16,8 @@ import pick from "lodash/object/pick";
 const version = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).version;
 
 const DEFAULT_OPTS = {
-  preserveTimestamps: "all"
+  preserveTimestamps: "all",
+  delete: false
 };
 
 class FSSyncer extends EventEmitter {
@@ -33,6 +33,11 @@ class FSSyncer extends EventEmitter {
     this._dest = dest;
 
     this._preserveTimestamps = opts.preserveTimestamps;
+
+    this._delete = opts.delete;
+    if (this._delete) {
+      this._visited = new Set();
+    }
 
     if (!dest) {
       throw new Error("A destination must be specified!");
@@ -50,6 +55,12 @@ class FSSyncer extends EventEmitter {
   }
 
   _handleReady() {
+    // If we were tracking visited files before the "ready" event then we
+    // have the delete option enabled. Time to visit the destination and
+    // ensure we remove everything not visited. We do this synchronously
+    // to ensure we're in a consistent state when we get subsequent updates
+    // from Chokidar.
+    this._deleteUnvisitedFiles();
     this.emit("ready");
   }
 
@@ -90,6 +101,26 @@ class FSSyncer extends EventEmitter {
 
     this.emit(event, filePath, destPath, stat);
     this.emit("all", event, filePath, destPath, stat);
+  }
+
+  _deleteUnvisitedFiles() {
+    if (!this._visited || !this._delete) {
+      delete this._visited;
+      return;
+    }
+
+    const visitStack = fs.readdirSync(this._dest);
+    while (visitStack.length) {
+      const f = visitStack.pop();
+      if (!this._visited.has(f)) {
+        // We did not visit this file so delete it.
+        fs.removeSync(path.join(this._dest, f));
+      } else if (fs.statSync(f).isDirectory()) {
+        fs.readdirSync(f).forEach(subfile => visitStack.push(path.join(f, subfile)));
+      }
+    }
+
+    delete this._visited;
   }
 }
 

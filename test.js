@@ -54,6 +54,48 @@ describe("watchSync", function() {
           done();
         });
       });
+
+      it("removes files from dest that don't exist in src with delete=true", function(done) {
+        var destFile = path.join(destDir, "test.txt");
+        fs.writeFileSync(destFile, content, "utf8");
+        watcher = watchSync.sync(".", destDir, { delete: true });
+        watcher.on("ready", function() {
+          expect(function() { fs.statSync(destFile); }).to.throw(Error);
+          done();
+        });
+      });
+
+      it("removes directories from dest that don't exist in src with delete=true", function(done) {
+        var dest = path.join(destDir, "testDir");
+        fs.mkdirSync(dest);
+        watcher = watchSync.sync(".", destDir, { delete: true });
+        watcher.on("ready", function() {
+          expect(function() { fs.statSync(dest); }).to.throw(Error);
+          done();
+        });
+      });
+
+      it("does not remove files from dest that don't exist in src with delete=false", function(done) {
+        var destFile = path.join(destDir, "test.txt");
+        fs.writeFileSync(destFile, content, "utf8");
+        watcher = watchSync.sync(".", destDir, { delete: false });
+        watcher.on("ready", function() {
+          var stat = fs.statSync(destFile);
+          expect(stat.isFile()).is.true;
+          done();
+        });
+      });
+
+      it("does not remove directories from dest that don't exist in src with delete=false", function(done) {
+        var dest = path.join(destDir, "testDir");
+        fs.mkdirSync(dest);
+        watcher = watchSync.sync(".", destDir, { delete: false });
+        watcher.on("ready", function() {
+          var stat = fs.statSync(dest);
+          expect(stat.isDirectory()).is.true;
+          done();
+        });
+      });
     });
 
     describe("after ready", function() {
@@ -98,6 +140,74 @@ describe("watchSync", function() {
           });
         });
       });
+
+      it("removes files from dest with delete=true", function(done) {
+        var srcFile = path.join(srcDir, "test.txt");
+        fs.writeFileSync(srcFile, content, "utf8");
+        watcher = watchSync.sync(".", destDir, { delete: true });
+        watcher.on("ready", function() {
+          watcher.on("unlink", function(filePath, destPath) {
+            expect(filePath).equals("test.txt");
+            expect(destPath).equals(path.join(destDir, "test.txt"));
+            expect(function() {
+              fs.statSync(path.join(destDir, "test.txt"));
+            }).to.throw(Error);
+            done();
+          });
+          fs.unlinkSync(srcFile);
+        });
+      });
+
+      it("removes directories from dest with delete=true", function(done) {
+        var src = path.join(srcDir, "testDir");
+        fs.mkdirSync(src);
+        watcher = watchSync.sync(".", destDir, { delete: true });
+        watcher.on("ready", function() {
+          watcher.on("unlinkDir", function(filePath, destPath) {
+            expect(filePath).equals("testDir");
+            expect(destPath).equals(path.join(destDir, "testDir"));
+            expect(function() {
+              fs.statSync(path.join(destDir, "testDir"));
+            }).to.throw(Error);
+            done();
+          });
+          fs.rmdirSync(src);
+        });
+      });
+
+      it("does not remove files from dest with delete=false", function(done) {
+        var srcFile = path.join(srcDir, "test.txt");
+        fs.writeFileSync(srcFile, content, "utf8");
+        watcher = watchSync.sync(".", destDir, { delete: false });
+        watcher.on("ready", function() {
+          watcher.on("unlink", function() {
+            done(new Error("Received unlink event - should not have deleted file"));
+          });
+          fs.unlinkSync(srcFile);
+          setTimeout(function() {
+            var stat = fs.statSync(path.join(destDir, "test.txt"));
+            expect(stat.isFile()).is.true;
+            done();
+          }, 20);
+        });
+      });
+
+      it("does not remove directories with delete=false", function(done) {
+        var src = path.join(srcDir, "testDir");
+        fs.mkdirSync(src);
+        watcher = watchSync.sync(".", destDir, { delete: false });
+        watcher.on("ready", function() {
+          watcher.on("unlinkDir", function(filePath, destPath) {
+            done(new Error("Received unlink event - should not have deleted file"));
+          });
+          fs.rmdirSync(src);
+          setTimeout(function() {
+            var stat = fs.statSync(path.join(destDir, "testDir"));
+            expect(stat.isDirectory()).is.true;
+            done();
+          }, 20);
+        });
+      });
     });
 
     it("works from another directory with cwd option", function(done) {
@@ -112,6 +222,12 @@ describe("watchSync", function() {
         expect(fs.readFileSync(destFile, "utf8")).equals(content);
         done();
       });
+    });
+
+    it("does not allow globs with absolute directories", function() {
+      expect(function() {
+        watcher = watchSync.sync(path.resolve("."), destDir);
+      }).to.throw(Error);
     });
 
     it("preserves file timestamps with preserveTimestamps = file", function(done) {
@@ -173,7 +289,6 @@ describe("watchSync", function() {
         });
       }, 1000);
     });
-
   });
 
   describe("version", function() {
