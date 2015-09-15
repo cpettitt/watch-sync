@@ -6,6 +6,7 @@
   "scripts": {
     "build": "babel index.es6 --out-file index.js --source-maps=external",
     "pretest": "npm run build",
+    "postinstall": "npm run build",
     "test": "mocha test"
   },
   "author": "Chris Pettitt <cpettitt@gmail.com>",
