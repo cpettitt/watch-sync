@@ -1,6 +1,6 @@
 {
   "name": "watch-sync",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Watch for file changes and replicate them to a new location",
   "main": "index.js",
   "scripts": {
