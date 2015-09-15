@@ -47,8 +47,8 @@ watchSync.sync(srcGlob, destDir, [options])
 - `delete` (default: `false`). If `true` delete files during the initial sync
   that are in `destDir` but not in `srcGlob`. After initial sync delete files
   from `destDir` as they are removed from `srcGlob`.
-- `cwd` (default: `undefined`). If set, use the `cwd` directory as the base
-  directory on which to apply the `srcGlob`.
+- `cwd` (default: `.`). Use the `cwd` directory as the base directory on which
+  to apply the `srcGlob`.
 - `preserveTimestamps` (default: `all`). If enabled sets the `atime` and
   `mtime` for synchronized files to their source; otherwise `atime` and `mtime`
   reflect the creation of the destination object (file or directory). Use
