@@ -116,11 +116,12 @@ class FSSyncer extends EventEmitter {
     const visitStack = fs.readdirSync(this._dest);
     while (visitStack.length) {
       const f = visitStack.pop();
+      const qualifiedF = path.join(this._dest, f);
       if (!this._visited.has(f)) {
         // We did not visit this file so delete it.
-        fs.removeSync(path.join(this._dest, f));
-      } else if (fs.statSync(f).isDirectory()) {
-        fs.readdirSync(f).forEach(subfile => visitStack.push(path.join(f, subfile)));
+        fs.removeSync(qualifiedF);
+      } else if (fs.statSync(qualifiedF).isDirectory()) {
+        fs.readdirSync(qualifiedF).forEach(subfile => visitStack.push(path.join(f, subfile)));
       }
     }
 

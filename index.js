@@ -169,11 +169,12 @@ var FSSyncer = (function (_EventEmitter) {
 
       var _loop = function () {
         var f = visitStack.pop();
+        var qualifiedF = _path2["default"].join(_this2._dest, f);
         if (!_this2._visited.has(f)) {
           // We did not visit this file so delete it.
-          _fsExtra2["default"].removeSync(_path2["default"].join(_this2._dest, f));
-        } else if (_fsExtra2["default"].statSync(f).isDirectory()) {
-          _fsExtra2["default"].readdirSync(f).forEach(function (subfile) {
+          _fsExtra2["default"].removeSync(qualifiedF);
+        } else if (_fsExtra2["default"].statSync(qualifiedF).isDirectory()) {
+          _fsExtra2["default"].readdirSync(qualifiedF).forEach(function (subfile) {
             return visitStack.push(_path2["default"].join(f, subfile));
           });
         }
