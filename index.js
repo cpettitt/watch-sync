@@ -144,6 +144,10 @@ var FSSyncer = (function (_EventEmitter) {
           break;
         case "unlink":
         case "unlinkDir":
+          if (!this._delete) {
+            // Do not fire an event since we did not actually delete the file.
+            return;
+          }
           _fsExtra2["default"].removeSync(destPath);
           break;
       }

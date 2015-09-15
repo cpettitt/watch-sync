@@ -188,7 +188,7 @@ describe("watchSync", function() {
             var stat = fs.statSync(path.join(destDir, "test.txt"));
             expect(stat.isFile()).is.true;
             done();
-          }, 20);
+          }, 500);
         });
       });
 
@@ -198,14 +198,14 @@ describe("watchSync", function() {
         watcher = watchSync.sync(".", destDir, { delete: false });
         watcher.on("ready", function() {
           watcher.on("unlinkDir", function(filePath, destPath) {
-            done(new Error("Received unlink event - should not have deleted file"));
+            done(new Error("Received unlinkDir event - should not have deleted file"));
           });
           fs.rmdirSync(src);
           setTimeout(function() {
             var stat = fs.statSync(path.join(destDir, "testDir"));
             expect(stat.isDirectory()).is.true;
             done();
-          }, 20);
+          }, 500);
         });
       });
     });

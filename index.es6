@@ -95,6 +95,10 @@ class FSSyncer extends EventEmitter {
         break;
       case "unlink":
       case "unlinkDir":
+        if (!this._delete) {
+          // Do not fire an event since we did not actually delete the file.
+          return;
+        }
         fs.removeSync(destPath);
         break;
     }
