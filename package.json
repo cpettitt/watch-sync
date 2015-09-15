@@ -11,6 +11,7 @@
   "author": "Chris Pettitt <cpettitt@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "babel": "^5.8.23",
     "chokidar": "^1.0.5",
     "fs-extra": "^0.24.0",
     "glob-parent": "^1.2.0",
@@ -19,7 +20,6 @@
     "source-map-support": "^0.3.2"
   },
   "devDependencies": {
-    "babel": "^5.8.23",
     "chai": "^3.2.0",
     "mocha": "^2.3.2",
     "temp": "^0.8.3"
