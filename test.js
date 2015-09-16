@@ -121,6 +121,64 @@ describe("watchSync", function() {
           fs.writeFileSync(path.join(srcDir, file), "New Content!");
         });
     });
+
+    it("deletes file if delete=true", function(done) {
+      var file = "test.txt";
+      createWatcher(".", destDir, { cwd: srcDir, delete: true })
+        .on("ready", function() {
+          this.on("unlink", function(filePath, destPath) {
+            expect(filePath).equals(file);
+            expect(destPath).equals(path.join(destDir, file));
+            expectNotExists(file);
+            done();
+          });
+          fs.unlinkSync(path.join(srcDir, file));
+        });
+    });
+
+    it("does not delete files if delete=false", function(done) {
+      var file = "test.txt";
+      createWatcher(".", destDir, { cwd: srcDir, delete: false })
+        .on("ready", function() {
+          this.on("unlink", function(filePath, destPath) {
+            throw new Error("Received unlink event - should not have deleted file");
+          });
+          fs.unlinkSync(path.join(srcDir, file));
+          setTimeout(function() {
+            expectFileExists(file);
+            done();
+          }, 200);
+        });
+    });
+
+    it("deletes directories if delete=true", function(done) {
+      var dir = path.join("sd1", "sd1-1");
+      createWatcher(".", destDir, { cwd: srcDir, delete: true })
+        .on("ready", function() {
+          this.on("unlinkDir", function(filePath, destPath) {
+            expect(filePath).equals(dir);
+            expect(destPath).equals(path.join(destDir, dir));
+            expectNotExists(dir);
+            done();
+          });
+          fs.rmdirSync(path.join(srcDir, dir));
+        });
+    });
+
+    it("does not delete directories if delete=true", function(done) {
+      var dir = path.join("sd1", "sd1-1");
+      createWatcher(".", destDir, { cwd: srcDir, delete: false })
+        .on("ready", function() {
+          this.on("unlinkDir", function(filePath, destPath) {
+            throw new Error("Received unlinkDir event - should not have deleted directory");
+          });
+          fs.rmdirSync(path.join(srcDir, dir));
+          setTimeout(function() {
+            expectDirExists(dir);
+            done();
+          }, 200);
+        });
+    });
   });
 
   function readFile(path) {
