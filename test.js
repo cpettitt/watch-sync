@@ -13,13 +13,20 @@ describe("watchSync", function() {
   var destDir;
   var createdWatchers;
 
-  beforeEach(function() {
+  beforeEach(function(done) {
     tempRoot = temp.mkdirSync();
     srcDir = path.join(tempRoot, "src");
     fs.copySync("test-fs", srcDir);
     destDir = path.join(tempRoot, "dest");
     fs.mkdirsSync(destDir);
     createdWatchers = [];
+
+    // I've observed an apparent race occassionally on OSX where we copy the
+    // test-fs directory synchronously above, add a watcher in tests below, and
+    // get duplicated watch events. I've only reproduced this with `useFsEvents
+    // = true`, so it may be a problem with fsevents. For now, this incredibly
+    // lame timeout seems to have stabilized the tests.
+    setTimeout(function() { done(); }, 10);
   });
 
   afterEach(function() {
