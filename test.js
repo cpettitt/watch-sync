@@ -181,6 +181,12 @@ describe("watchSync", function() {
     });
   });
 
+  it("does not allow globs with absolute paths", function() {
+    expect(function() {
+      createWatcher(path.resolve("."), destDir, { cwd: srcDir });
+    }).to.throw();
+  });
+
   function readFile(path) {
     return fs.readFileSync(path, "utf8");
   }
