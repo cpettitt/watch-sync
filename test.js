@@ -170,7 +170,7 @@ describe("watchSync", function() {
         });
     });
 
-    it("does not delete directories if delete=true", function(done) {
+    it("does not delete directories if delete=false", function(done) {
       var dir = path.join("sd1", "sd1-1");
       createWatcher(".", destDir, { cwd: srcDir, delete: false })
         .on("ready", function() {
@@ -204,7 +204,7 @@ describe("watchSync", function() {
     }).to.throw();
   });
 
-  describe("presrveTimestamps", function() {
+  describe("preserveTimestamps", function() {
     var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
 
     describe("= 'all'", function() {
