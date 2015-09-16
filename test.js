@@ -1,7 +1,7 @@
 "use strict";
 
 var expect = require("chai").expect;
-var fs = require("fs");
+var fs = require("fs-extra");
 var path = require("path");
 var temp = require("temp");
 var watchSync = require("./");
@@ -11,299 +11,116 @@ describe("watchSync", function() {
   var tempRoot;
   var srcDir;
   var destDir;
-  var content;
-  var watcher;
+  var createdWatchers;
 
   beforeEach(function() {
     tempRoot = temp.mkdirSync();
     srcDir = path.join(tempRoot, "src");
-    fs.mkdirSync(srcDir);
+    fs.copySync("test-fs", srcDir);
     destDir = path.join(tempRoot, "dest");
-    fs.mkdirSync(destDir);
-    content = "test content";
-    process.chdir(srcDir);
+    fs.mkdirsSync(destDir);
+    createdWatchers = [];
   });
 
   afterEach(function() {
     process.chdir(initialDir);
-    if (watcher) {
+    createdWatchers.forEach(function(watcher) {
       watcher.close();
-      watcher = null;
-    }
+    });
   });
 
   describe("before ready", function() {
-    it("copies initial files from src to dest", function(done) {
-      fs.writeFileSync(path.join(srcDir, "test.txt"), content, "utf8");
-      watcher = watchSync(".", destDir);
-      watcher.on("ready", function() {
-        var destFile = path.join(destDir, "test.txt");
-        fs.statSync(destFile);
-        expect(fs.readFileSync(destFile, "utf8")).equals(content);
-        done();
-      });
+    it("copies initial structure from src to dest", function(done) {
+      createWatcher(".", destDir, { cwd: srcDir })
+        .on("ready", function() {
+          expectFileSynced("test.txt");
+          expectDirExists("sd1");
+          expectFileSynced(path.join("sd1", "test.json"));
+          expectDirExists(path.join("sd1", "sd1-1"));
+          done();
+        });
     });
 
-    it("creates directories from src in dest", function(done) {
-      fs.mkdirSync(path.join(srcDir, "testDir"));
-      watcher = watchSync(".", destDir);
-      watcher.on("ready", function() {
-        var stat = fs.statSync(path.join(destDir, "testDir"));
-        expect(stat.isDirectory()).is.true;
-        done();
-      });
-    });
+    describe("delete objects", function() {
+      var dirToDelete;
+      var fileToDelete;
 
-    it("removes files from dest that don't exist in src with delete=true", function(done) {
-      var destFile = path.join(destDir, "test.txt");
-      fs.writeFileSync(destFile, content, "utf8");
-      watcher = watchSync(".", destDir, { delete: true });
-      watcher.on("ready", function() {
-        expect(function() { fs.statSync(destFile); }).to.throw(Error);
-        done();
+      beforeEach(function() {
+        dirToDelete = path.join(destDir, "delete-me-dir");
+        fs.mkdirsSync(dirToDelete);
+        fileToDelete = path.join(destDir, "delete-me-file");
+        fs.writeJsonSync(fileToDelete);
       });
-    });
 
-    it("removes directories from dest that don't exist in src with delete=true", function(done) {
-      var dest = path.join(destDir, "testDir");
-      fs.mkdirSync(dest);
-      watcher = watchSync(".", destDir, { delete: true });
-      watcher.on("ready", function() {
-        expect(function() { fs.statSync(dest); }).to.throw(Error);
-        done();
+      it("happens if delete=true", function(done) {
+        createWatcher(".", destDir, { cwd: srcDir, delete: true })
+          .on("ready", function() {
+            expectNotExists("delete-me-dir");
+            expectNotExists("delete-me-file");
+            done();
+          });
       });
-    });
 
-    it("does not remove files from dest that don't exist in src with delete=false", function(done) {
-      var destFile = path.join(destDir, "test.txt");
-      fs.writeFileSync(destFile, content, "utf8");
-      watcher = watchSync(".", destDir, { delete: false });
-      watcher.on("ready", function() {
-        var stat = fs.statSync(destFile);
-        expect(stat.isFile()).is.true;
-        done();
-      });
-    });
-
-    it("does not remove directories from dest that don't exist in src with delete=false", function(done) {
-      var dest = path.join(destDir, "testDir");
-      fs.mkdirSync(dest);
-      watcher = watchSync(".", destDir, { delete: false });
-      watcher.on("ready", function() {
-        var stat = fs.statSync(dest);
-        expect(stat.isDirectory()).is.true;
-        done();
+      it("does not happen if delete=false", function(done) {
+        createWatcher(".", destDir, { cwd: srcDir, delete: false })
+          .on("ready", function() {
+            expectDirExists("delete-me-dir");
+            expectFileExists("delete-me-file");
+            done();
+          });
       });
     });
   });
 
   describe("after ready", function() {
-    it("copies files added", function(done) {
-      watcher = watchSync(".", destDir);
-      watcher.on("ready", function() {
-        fs.writeFileSync(path.join(srcDir, "test.txt"), content, "utf8");
-        watcher.on("add", function(filePath, destPath) {
-          expect(filePath).equals("test.txt");
-          expect(destPath).equals(path.join(destDir, "test.txt"));
-          expect(fs.readFileSync(destPath, "utf8")).equals(content);
-          done();
+    it("copies new files from src to dest", function(done) {
+      var newFile = "new-file";
+      createWatcher(".", destDir, { cwd: srcDir })
+        .on("ready", function() {
+          this.on("add", function(filePath, destPath) {
+            expect(filePath).equals(newFile);
+            expect(destPath).equals(path.join(destDir, newFile));
+            expectFileSynced(newFile);
+            done();
+          });
+          fs.writeJsonSync(path.join(srcDir, newFile), { json: "sure!" });
         });
-      });
-    });
-
-    it("copies files changed", function(done) {
-      var srcPath = path.join(srcDir, "test.txt");
-      fs.writeFileSync(srcPath, "initial content", "utf8");
-      watcher = watchSync(".", destDir);
-      watcher.on("ready", function() {
-        watcher.on("change", function(filePath, destPath) {
-          expect(filePath).equals("test.txt");
-          expect(destPath).equals(path.join(destDir, "test.txt"));
-          expect(fs.readFileSync(destPath, "utf8")).equals(content);
-          done();
-        });
-        fs.writeFileSync(path.join(srcDir, "test.txt"), content, "utf8");
-      });
-    });
-
-    it("creates directories from src in dest", function(done) {
-      watcher = watchSync(".", destDir);
-      watcher.on("ready", function() {
-        fs.mkdirSync(path.join(srcDir, "testDir"));
-        watcher.on("addDir", function(filePath, destPath) {
-          expect(filePath).equals("testDir");
-          expect(destPath).equals(path.join(destDir, "testDir"));
-          var stat = fs.statSync(path.join(destDir, "testDir"));
-          expect(stat.isDirectory()).is.true;
-          done();
-        });
-      });
-    });
-
-    it("removes files from dest with delete=true", function(done) {
-      var srcFile = path.join(srcDir, "test.txt");
-      fs.writeFileSync(srcFile, content, "utf8");
-      watcher = watchSync(".", destDir, { delete: true });
-      watcher.on("ready", function() {
-        watcher.on("unlink", function(filePath, destPath) {
-          expect(filePath).equals("test.txt");
-          expect(destPath).equals(path.join(destDir, "test.txt"));
-          expect(function() {
-            fs.statSync(path.join(destDir, "test.txt"));
-          }).to.throw(Error);
-          done();
-        });
-        fs.unlinkSync(srcFile);
-      });
-    });
-
-    it("removes directories from dest with delete=true", function(done) {
-      var src = path.join(srcDir, "testDir");
-      fs.mkdirSync(src);
-      watcher = watchSync(".", destDir, { delete: true });
-      watcher.on("ready", function() {
-        watcher.on("unlinkDir", function(filePath, destPath) {
-          expect(filePath).equals("testDir");
-          expect(destPath).equals(path.join(destDir, "testDir"));
-          expect(function() {
-            fs.statSync(path.join(destDir, "testDir"));
-          }).to.throw(Error);
-          done();
-        });
-        fs.rmdirSync(src);
-      });
-    });
-
-    it("does not remove files from dest with delete=false", function(done) {
-      var srcFile = path.join(srcDir, "test.txt");
-      fs.writeFileSync(srcFile, content, "utf8");
-      watcher = watchSync(".", destDir, { delete: false });
-      watcher.on("ready", function() {
-        watcher.on("unlink", function() {
-          done(new Error("Received unlink event - should not have deleted file"));
-        });
-        fs.unlinkSync(srcFile);
-        setTimeout(function() {
-          var stat = fs.statSync(path.join(destDir, "test.txt"));
-          expect(stat.isFile()).is.true;
-          done();
-        }, 500);
-      });
-    });
-
-    it("does not remove directories with delete=false", function(done) {
-      var src = path.join(srcDir, "testDir");
-      fs.mkdirSync(src);
-      watcher = watchSync(".", destDir, { delete: false });
-      watcher.on("ready", function() {
-        watcher.on("unlinkDir", function(filePath, destPath) {
-          done(new Error("Received unlinkDir event - should not have deleted file"));
-        });
-        fs.rmdirSync(src);
-        setTimeout(function() {
-          var stat = fs.statSync(path.join(destDir, "testDir"));
-          expect(stat.isDirectory()).is.true;
-          done();
-        }, 500);
-      });
     });
   });
 
-  it("handles file adds from another directory with cwd option", function(done) {
-    var otherDir = path.join(tempRoot, "other");
-    fs.mkdirSync(otherDir);
-    process.chdir(otherDir);
-    fs.writeFileSync(path.join(srcDir, "test.txt"), content, "utf8");
-    watcher = watchSync(".", destDir, { cwd: srcDir });
-    watcher.on("ready", function() {
-      var destFile = path.join(destDir, "test.txt");
-      fs.statSync(destFile);
-      expect(fs.readFileSync(destFile, "utf8")).equals(content);
-      done();
-    });
-  });
+  function readFile(path) {
+    return fs.readFileSync(path, "utf8");
+  }
 
-  it("handles file deletes from another directory with cwd option", function(done) {
-    var otherDir = path.join(tempRoot, "other");
-    fs.mkdirSync(otherDir);
-    process.chdir(otherDir);
-    // Add file to otherDir (current dir) and destDir, but not to srcDir. This should
-    // cause the watcher to remove the file from destDir.
-    fs.writeFileSync(path.join(otherDir, "test.txt"), content, "utf8");
-    fs.writeFileSync(path.join(destDir, "test.txt"), content, "utf8");
-    watcher = watchSync(".", destDir, { cwd: srcDir, delete: true });
-    watcher.on("ready", function() {
-      var destFile = path.join(destDir, "test.txt");
-      expect(function() { fs.statSync(destFile); }).to.throw(Error);
-      done();
-    });
-  });
+  function expectFileSynced(relativePath) {
+    expectFileExists(relativePath);
 
-  it("does not allow globs with absolute directories", function() {
+    var srcFile = path.join(srcDir, relativePath);
+    var destFile = path.join(destDir, relativePath);
+    expect(readFile(destFile)).equals(readFile(srcFile));
+  }
+
+  function expectFileExists(relativePath) {
+    var destFile = path.join(destDir, relativePath);
+    expect(fs.statSync(destFile).isFile()).is.true;
+  }
+
+  function expectDirExists(relativePath) {
+    expect(fs.statSync(path.join(destDir, relativePath)).isDirectory()).is.true;
+  }
+
+  function expectNotExists(relativePath) {
     expect(function() {
-      watcher = watchSync(path.resolve("."), destDir);
-    }).to.throw(Error);
-  });
+      fs.statSync(path.join(destDir, relativePath));
+    }).to.throw();
+  }
 
-  it("preserves file timestamps with preserveTimestamps = file", function(done) {
-    var srcFile = path.join(srcDir, "test.txt");
-    fs.writeFileSync(srcFile, content, "utf8");
-    setTimeout(function() {
-      watcher = watchSync(".", destDir, { preserveTimestamps: "file" });
-      watcher.on("ready", function() {
-        var destFile = path.join(destDir, "test.txt");
-        var srcStat = fs.statSync(srcFile);
-        var destStat = fs.statSync(destFile);
-        expect(destStat.mtime.getTime()).equals(srcStat.mtime.getTime());
-        done();
-      });
-    }, 1000);
-  });
-
-  it("preserves directory timestamps with preserveTimestamps = dir", function(done) {
-    var src = path.join(srcDir, "test.txt");
-    fs.mkdirSync(src);
-    setTimeout(function() {
-      watcher = watchSync(".", destDir, { preserveTimestamps: "dir" });
-      watcher.on("ready", function() {
-        var dest = path.join(destDir, "test.txt");
-        var srcStat = fs.statSync(src);
-        var destStat = fs.statSync(dest);
-        expect(destStat.mtime.getTime()).equals(srcStat.mtime.getTime());
-        done();
-      });
-    }, 1000);
-  });
-
-  it("doesn't preserve file timestamps with preserveTimestamps = dir", function(done) {
-    var srcFile = path.join(srcDir, "test.txt");
-    fs.writeFileSync(srcFile, content, "utf8");
-    setTimeout(function() {
-      watcher = watchSync(".", destDir, { preserveTimestamps: "dir" });
-      watcher.on("ready", function() {
-        var destFile = path.join(destDir, "test.txt");
-        var srcStat = fs.statSync(srcFile);
-        var destStat = fs.statSync(destFile);
-        expect(destStat.mtime.getTime()).not.equals(srcStat.mtime.getTime());
-        done();
-      });
-    }, 1000);
-  });
-
-  it("doesn't preserve directory timestamps with preserveTimestamps = file", function(done) {
-    var src = path.join(srcDir, "test.txt");
-    fs.mkdirSync(src);
-    setTimeout(function() {
-      watcher = watchSync(".", destDir, { preserveTimestamps: "file" });
-      watcher.on("ready", function() {
-        var dest = path.join(destDir, "test.txt");
-        var srcStat = fs.statSync(src);
-        var destStat = fs.statSync(dest);
-        expect(destStat.mtime.getTime()).not.equals(srcStat.mtime.getTime());
-        done();
-      });
-    }, 1000);
-  });
+  function createWatcher() {
+    var args = Array.prototype.slice.call(arguments);
+    var watcher = watchSync.apply(watchSync, args);
+    createdWatchers.push(watcher);
+    return watcher;
+  }
 });
 
 describe("watchSync.version", function() {
@@ -312,3 +129,4 @@ describe("watchSync.version", function() {
     expect(watchSync.version).equals(version);
   });
 });
+
