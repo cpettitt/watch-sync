@@ -37,15 +37,14 @@ class FSSyncer extends EventEmitter {
     this._preserveFileTimestamps = includes(["all", "file"], opts.preserveTimestamps);
     this._preserveDirTimestamps = includes(["all", "dir"], opts.preserveTimestamps);
 
-    this._delete = opts.delete;
-
     // Have we hit the ready state?
     this._ready = false;
 
     // Functions to execute after we hit the ready state.
     this._postReadyFunctions = [];
 
-    if (this._delete === "all") {
+    this._delete = includes(["after-ready", "all"], opts.delete);
+    if (opts.delete === "all") {
       // Simply remove everything from the dest dir before we get started.
       fs.removeSync(dest);
     }
@@ -104,7 +103,7 @@ class FSSyncer extends EventEmitter {
         break;
       case "unlink":
       case "unlinkDir":
-        if (this._delete !== "all") {
+        if (!this._delete) {
           // Do not fire an event since we did not actually delete the file.
           return;
         }

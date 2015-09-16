@@ -73,6 +73,15 @@ describe("watchSync", function() {
           });
       });
 
+      it("does not happen if delete='after-ready'", function(done) {
+        createWatcher(".", destDir, { cwd: srcDir, delete: "after-ready" })
+          .on("ready", function() {
+            expectDirExists("delete-me-dir");
+            expectFileExists("delete-me-file");
+            done();
+          });
+      });
+
       it("does not happen if delete='none'", function(done) {
         createWatcher(".", destDir, { cwd: srcDir, delete: "none" })
           .on("ready", function() {
@@ -130,6 +139,20 @@ describe("watchSync", function() {
     it("deletes file if delete='all'", function(done) {
       var file = "test.txt";
       createWatcher(".", destDir, { cwd: srcDir, delete: "all" })
+        .on("ready", function() {
+          this.on("unlink", function(filePath, destPath) {
+            expect(filePath).equals(file);
+            expect(destPath).equals(path.join(destDir, file));
+            expectNotExists(file);
+            done();
+          });
+          fs.unlinkSync(path.join(srcDir, file));
+        });
+    });
+
+    it("deletes file if delete='after-ready'", function(done) {
+      var file = "test.txt";
+      createWatcher(".", destDir, { cwd: srcDir, delete: "after-ready" })
         .on("ready", function() {
           this.on("unlink", function(filePath, destPath) {
             expect(filePath).equals(file);

@@ -42,7 +42,12 @@ initial sync. You can close the watcher with `watcher.close()`.
 - `persistent` (default: `true`). If `true` continue to watch the srcGlob for
   changes after the initial sync. To close a persistent watcher use
   `watcher.close()`.
-- `delete` (default: `"none"`). If `"all"` delete files during the initial sync
+- `delete` (default: `"none"`).  If `"none"` never delete an object from the
+  dest dir. If `"after-ready" only delete objects that are removed after the
+  "ready" event has been fired. If `"all"` delete all objects not in the src
+  dir during initial sync and then delete all files removed after the "ready"
+  event has fired.
+If `"all"` delete files during the initial sync
   that are in `destDir` but not in `srcGlob`. After initial sync delete files
   from `destDir` as they are removed from `srcGlob`.
 - `cwd` (default: `.`). Use the `cwd` directory as the base directory on which
