@@ -17,6 +17,11 @@ describe("watchSync", function() {
     tempRoot = temp.mkdirSync();
     srcDir = path.join(tempRoot, "src");
     fs.copySync("test-fs", srcDir);
+
+    // We want test-fd/sd1/sd1-1 to be empty, but git doesn't track empty
+    // directories, so we delete a dummy file after copying it to `srcDir`.
+    fs.unlinkSync(path.join(srcDir, "sd1", "sd1-1", "README"));
+
     destDir = path.join(tempRoot, "dest");
     fs.mkdirsSync(destDir);
     createdWatchers = [];

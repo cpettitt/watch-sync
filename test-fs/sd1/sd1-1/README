@@ -1,0 +1,2 @@
+This is supposed to be an empty directory, but git does not track empty
+directories. Instead we remove this file (README) during test.
