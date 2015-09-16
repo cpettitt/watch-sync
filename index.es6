@@ -12,9 +12,6 @@ import isAbsolute from "path-is-absolute";
 import path from "path";
 import pick from "lodash/object/pick";
 
-// Read version in from package.json
-const version = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).version;
-
 const DEFAULT_OPTS = {
   preserveTimestamps: "all",
   delete: false
@@ -129,9 +126,12 @@ class FSSyncer extends EventEmitter {
   }
 }
 
-function sync(glob, dest, opts) {
+function watchSync(glob, dest, opts) {
   return new FSSyncer(glob, dest, opts);
 }
+// Read version in from package.json
+watchSync.version = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).version;
+
 
 function filterChokidarOptions(opts) {
   return pick(opts, [
@@ -142,7 +142,4 @@ function filterChokidarOptions(opts) {
   ]);
 }
 
-export default {
-  sync,
-  version
-};
+export default watchSync;
