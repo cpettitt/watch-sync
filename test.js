@@ -107,6 +107,20 @@ describe("watchSync", function() {
           fs.mkdirSync(path.join(srcDir, newDir));
         });
     });
+
+    it("copies changed files from src to dest", function(done) {
+      var file = "test.txt";
+      createWatcher(".", destDir, { cwd: srcDir })
+        .on("ready", function() {
+          this.on("change", function(filePath, destPath) {
+            expect(filePath).equals(file);
+            expect(destPath).equals(path.join(destDir, file));
+            expectFileSynced(file);
+            done();
+          });
+          fs.writeFileSync(path.join(srcDir, file), "New Content!");
+        });
+    });
   });
 
   function readFile(path) {
