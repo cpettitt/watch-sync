@@ -7,6 +7,7 @@ import "babel/polyfill";
 import { EventEmitter } from "events";
 import chokidar from "chokidar";
 import defaults from "lodash/object/defaults";
+import includes from "lodash/collection/includes";
 import fs from "fs-extra";
 import isAbsolute from "path-is-absolute";
 import path from "path";
@@ -29,17 +30,31 @@ class FSSyncer extends EventEmitter {
     this._cwd = opts.cwd || ".";
     this._dest = dest;
 
-    this._preserveTimestamps = opts.preserveTimestamps;
+    this._preserveFileTimestamps = includes(["all", "file"], opts.preserveTimestamps);
+    this._preserveDirTimestamps = includes(["all", "dir"], opts.preserveTimestamps);
 
     this._delete = opts.delete;
-    if (this._delete) {
-      this._visited = new Set();
-    }
+    this._visited = new Set();
 
     if (!dest) {
       throw new Error("A destination must be specified!");
     }
     fs.ensureDirSync(dest);
+
+    // Have we hit the ready state?
+    this._ready = false;
+
+    // Functions to execute after we hit the ready state.
+    this._postReadyFunctions = [];
+
+    if (this._delete) {
+      // If we were tracking visited files before the "ready" event then we
+      // have the delete option enabled. Time to visit the destination and
+      // ensure we remove everything not visited. We do this synchronously
+      // to ensure we're in a consistent state when we get subsequent updates
+      // from Chokidar.
+      this._postReadyFunctions.push(() => this._deleteUnvisitedFiles());
+    }
 
     this._watcher = chokidar.watch(glob, filterChokidarOptions(opts))
       .on("all", (e, p, s) => this._handleWatchEvent(e, p, s))
@@ -52,12 +67,9 @@ class FSSyncer extends EventEmitter {
   }
 
   _handleReady() {
-    // If we were tracking visited files before the "ready" event then we
-    // have the delete option enabled. Time to visit the destination and
-    // ensure we remove everything not visited. We do this synchronously
-    // to ensure we're in a consistent state when we get subsequent updates
-    // from Chokidar.
-    this._deleteUnvisitedFiles();
+    this._ready = true;
+    this._postReadyFunctions.forEach(fn => fn());
+    delete this._postReadyFunctions;
     this.emit("ready");
   }
 
@@ -67,23 +79,20 @@ class FSSyncer extends EventEmitter {
 
   _handleWatchEvent(event, filePath, stat) {
     // If we're tracking visited files add filePath to the visited set.
-    if (this._visited && event !== "unlink" && event !== "unlinkDir") {
+    if (!this._ready && event !== "unlink" && event !== "unlinkDir") {
       this._visited.add(filePath);
     }
 
-    const timestamps = this._preserveTimestamps;
     const srcPath = path.join(this._cwd, filePath);
     const destPath = path.join(this._dest, filePath);
     switch (event) {
       case "add":
       case "change":
-        fs.copySync(srcPath, destPath, {
-          preserveTimestamps: timestamps === "all" || timestamps === "file" 
-        });
+        fs.copySync(srcPath, destPath, { preserveTimestamps: this._preserveFileTimestamps });
         break;
       case "addDir":
         fs.ensureDirSync(destPath);
-        if (timestamps === "all" || timestamps === "dir") {
+        if (this._preserveDirTimestamps) {
           if (!stat) {
             // Chokidar only sends stats if it gets them from the underlying
             // watch events. We don't want to force stats if we don't need
@@ -91,7 +100,17 @@ class FSSyncer extends EventEmitter {
             // we stat here if needed.
             stat = fs.statSync(srcPath);
           }
-          fs.utimesSync(destPath, stat.atime, stat.mtime);
+
+          const updateTimes = () => fs.utimesSync(destPath, stat.atime, stat.mtime);
+          if (this._ready) {
+            updateTimes();
+          } else {
+            // If we're not in the ready state then we defer updating the times
+            // for the directory. If we update immediately then it is possible
+            // that some other change to the directory (e.g. adding a file)
+            // will change its modify time.
+            this._postReadyFunctions.push(updateTimes);
+          }
         }
         break;
       case "unlink":
@@ -109,20 +128,17 @@ class FSSyncer extends EventEmitter {
   }
 
   _deleteUnvisitedFiles() {
-    if (!this._visited || !this._delete) {
-      delete this._visited;
-      return;
-    }
-
-    const visitStack = fs.readdirSync(this._dest);
-    while (visitStack.length) {
-      const f = visitStack.pop();
-      const qualifiedF = path.join(this._dest, f);
-      if (!this._visited.has(f)) {
-        // We did not visit this file so delete it.
-        fs.removeSync(qualifiedF);
-      } else if (fs.statSync(qualifiedF).isDirectory()) {
-        fs.readdirSync(qualifiedF).forEach(subfile => visitStack.push(path.join(f, subfile)));
+    if (this._delete) {
+      const visitStack = fs.readdirSync(this._dest);
+      while (visitStack.length) {
+        const f = visitStack.pop();
+        const qualifiedF = path.join(this._dest, f);
+        if (!this._visited.has(f)) {
+          // We did not visit this file so delete it.
+          fs.removeSync(qualifiedF);
+        } else if (fs.statSync(qualifiedF).isDirectory()) {
+          fs.readdirSync(qualifiedF).forEach(subfile => visitStack.push(path.join(f, subfile)));
+        }
       }
     }
 
@@ -135,7 +151,6 @@ function watchSync(glob, dest, opts) {
 }
 // Read version in from package.json
 watchSync.version = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).version;
-
 
 function filterChokidarOptions(opts) {
   return pick(opts, [

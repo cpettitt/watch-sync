@@ -187,6 +187,70 @@ describe("watchSync", function() {
     }).to.throw();
   });
 
+  describe("presrveTimestamps", function() {
+    var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
+
+    describe("= 'all'", function() {
+      preserveFileTimestamps("all", true);
+      preserveDirTimestamps("all", true);
+    });
+
+    describe("= 'file'", function() {
+      preserveFileTimestamps("file", true);
+      preserveDirTimestamps("file", false);
+    });
+
+    describe("= 'dir'", function() {
+      preserveFileTimestamps("dir", false);
+      preserveDirTimestamps("dir", true);
+    });
+
+    describe("= 'none'", function() {
+      preserveFileTimestamps("none", false);
+      preserveDirTimestamps("none", false);
+    });
+
+    function preserveFileTimestamps(preserveTimestamps, does) {
+      it("does" + (does ? "" : "n't") + " preserve file timestamps", function(done) {
+        var file = "test.txt";
+        var srcFile = path.join(srcDir, file);
+        var destFile = path.join(destDir, file);
+
+        fs.utimesSync(srcFile, yesterday, yesterday);
+
+        createWatcher(".", destDir, { cwd: srcDir, preserveTimestamps: preserveTimestamps })
+          .on("ready", function() {
+            var expectation = expect(fs.statSync(destFile).mtime.getTime());
+            if (!does) {
+              expectation = expectation.not;
+            }
+            expectation.equals(fs.statSync(srcFile).mtime.getTime());
+            done();
+          });
+      });
+    }
+
+    function preserveDirTimestamps(preserveTimestamps, does) {
+      it("does" + (does ? "" : "n't") + " preserve directory timestamps", function(done) {
+        var dir = "sd1";
+        var src  = path.join(srcDir, dir);
+        var dest  = path.join(destDir, dir);
+
+        fs.utimesSync(src, yesterday, yesterday);
+
+        createWatcher(".", destDir, { cwd: srcDir, preserveTimestamps: preserveTimestamps })
+          .on("ready", function() {
+            var expectation = expect(fs.statSync(dest).mtime.getTime());
+            if (!does) {
+              expectation = expectation.not;
+            }
+            expectation.equals(fs.statSync(src).mtime.getTime());
+            done();
+          });
+      });
+    }
+  });
+
   function readFile(path) {
     return fs.readFileSync(path, "utf8");
   }
