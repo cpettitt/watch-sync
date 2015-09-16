@@ -72,11 +72,12 @@ class FSSyncer extends EventEmitter {
     }
 
     const timestamps = this._preserveTimestamps;
+    const srcPath = path.join(this._cwd, filePath);
     const destPath = path.join(this._dest, filePath);
     switch (event) {
       case "add":
       case "change":
-        fs.copySync(path.join(this._cwd, filePath), destPath, {
+        fs.copySync(srcPath, destPath, {
           preserveTimestamps: timestamps === "all" || timestamps === "file" 
         });
         break;
@@ -84,8 +85,11 @@ class FSSyncer extends EventEmitter {
         fs.ensureDirSync(destPath);
         if (timestamps === "all" || timestamps === "dir") {
           if (!stat) {
-            // BUG it seems we sometimes do not get a stat from chokidar, so get it again.
-            stat = fs.statSync(filePath);
+            // Chokidar only sends stats if it gets them from the underlying
+            // watch events. We don't want to force stats if we don't need
+            // them, so we do not use Chokidar's `alwaysStat` option. Instead
+            // we stat here if needed.
+            stat = fs.statSync(srcPath);
           }
           fs.utimesSync(destPath, stat.atime, stat.mtime);
         }

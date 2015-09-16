@@ -93,6 +93,20 @@ describe("watchSync", function() {
           fs.writeJsonSync(path.join(srcDir, newFile), { json: "sure!" });
         });
     });
+
+    it("copies new directories from src to dest", function(done) {
+      var newDir = "new-dir";
+      createWatcher(".", destDir, { cwd: srcDir })
+        .on("ready", function() {
+          this.on("addDir", function(filePath, destPath) {
+            expect(filePath).equals(newDir);
+            expect(destPath).equals(path.join(destDir, newDir));
+            expectDirExists(newDir);
+            done();
+          });
+          fs.mkdirSync(path.join(srcDir, newDir));
+        });
+    });
   });
 
   function readFile(path) {
