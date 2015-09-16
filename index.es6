@@ -15,7 +15,7 @@ import pick from "lodash/object/pick";
 
 const DEFAULT_OPTS = {
   preserveTimestamps: "all",
-  delete: false
+  delete: "none"
 };
 
 class FSSyncer extends EventEmitter {
@@ -47,7 +47,7 @@ class FSSyncer extends EventEmitter {
     // Functions to execute after we hit the ready state.
     this._postReadyFunctions = [];
 
-    if (this._delete) {
+    if (this._delete === "all") {
       // If we were tracking visited files before the "ready" event then we
       // have the delete option enabled. Time to visit the destination and
       // ensure we remove everything not visited. We do this synchronously
@@ -115,7 +115,7 @@ class FSSyncer extends EventEmitter {
         break;
       case "unlink":
       case "unlinkDir":
-        if (!this._delete) {
+        if (this._delete !== "all") {
           // Do not fire an event since we did not actually delete the file.
           return;
         }
@@ -128,7 +128,7 @@ class FSSyncer extends EventEmitter {
   }
 
   _deleteUnvisitedFiles() {
-    if (this._delete) {
+    if (this._delete === "all") {
       const visitStack = fs.readdirSync(this._dest);
       while (visitStack.length) {
         const f = visitStack.pop();

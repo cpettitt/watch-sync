@@ -42,12 +42,12 @@ initial sync. You can close the watcher with `watcher.close()`.
 - `persistent` (default: `true`). If `true` continue to watch the srcGlob for
   changes after the initial sync. To close a persistent watcher use
   `watcher.close()`.
-- `delete` (default: `false`). If `true` delete files during the initial sync
+- `delete` (default: `"none"`). If `"all"` delete files during the initial sync
   that are in `destDir` but not in `srcGlob`. After initial sync delete files
   from `destDir` as they are removed from `srcGlob`.
 - `cwd` (default: `.`). Use the `cwd` directory as the base directory on which
   to apply the `srcGlob`.
-- `preserveTimestamps` (default: `all`). If enabled sets the `atime` and
+- `preserveTimestamps` (default: `"all"`). If enabled sets the `atime` and
   `mtime` for synchronized files to their source; otherwise `atime` and `mtime`
   reflect the creation of the destination object (file or directory). Use
   `preserveTimestamps = "file"` to enable this for files. Use

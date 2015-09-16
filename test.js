@@ -64,8 +64,8 @@ describe("watchSync", function() {
         fs.writeJsonSync(fileToDelete);
       });
 
-      it("happens if delete=true", function(done) {
-        createWatcher(".", destDir, { cwd: srcDir, delete: true })
+      it("happens if delete='all'", function(done) {
+        createWatcher(".", destDir, { cwd: srcDir, delete: "all" })
           .on("ready", function() {
             expectNotExists("delete-me-dir");
             expectNotExists("delete-me-file");
@@ -73,8 +73,8 @@ describe("watchSync", function() {
           });
       });
 
-      it("does not happen if delete=false", function(done) {
-        createWatcher(".", destDir, { cwd: srcDir, delete: false })
+      it("does not happen if delete='none'", function(done) {
+        createWatcher(".", destDir, { cwd: srcDir, delete: "none" })
           .on("ready", function() {
             expectDirExists("delete-me-dir");
             expectFileExists("delete-me-file");
@@ -127,9 +127,9 @@ describe("watchSync", function() {
         });
     });
 
-    it("deletes file if delete=true", function(done) {
+    it("deletes file if delete='all'", function(done) {
       var file = "test.txt";
-      createWatcher(".", destDir, { cwd: srcDir, delete: true })
+      createWatcher(".", destDir, { cwd: srcDir, delete: "all" })
         .on("ready", function() {
           this.on("unlink", function(filePath, destPath) {
             expect(filePath).equals(file);
@@ -141,9 +141,9 @@ describe("watchSync", function() {
         });
     });
 
-    it("does not delete files if delete=false", function(done) {
+    it("does not delete files if delete='none'", function(done) {
       var file = "test.txt";
-      createWatcher(".", destDir, { cwd: srcDir, delete: false })
+      createWatcher(".", destDir, { cwd: srcDir, delete: "none" })
         .on("ready", function() {
           this.on("unlink", function(filePath, destPath) {
             throw new Error("Received unlink event - should not have deleted file");
@@ -156,9 +156,9 @@ describe("watchSync", function() {
         });
     });
 
-    it("deletes directories if delete=true", function(done) {
+    it("deletes directories if delete='all'", function(done) {
       var dir = path.join("sd1", "sd1-1");
-      createWatcher(".", destDir, { cwd: srcDir, delete: true })
+      createWatcher(".", destDir, { cwd: srcDir, delete: "all" })
         .on("ready", function() {
           this.on("unlinkDir", function(filePath, destPath) {
             expect(filePath).equals(dir);
@@ -170,9 +170,9 @@ describe("watchSync", function() {
         });
     });
 
-    it("does not delete directories if delete=false", function(done) {
+    it("does not delete directories if delete='none'", function(done) {
       var dir = path.join("sd1", "sd1-1");
-      createWatcher(".", destDir, { cwd: srcDir, delete: false })
+      createWatcher(".", destDir, { cwd: srcDir, delete: "none" })
         .on("ready", function() {
           this.on("unlinkDir", function(filePath, destPath) {
             throw new Error("Received unlinkDir event - should not have deleted directory");
