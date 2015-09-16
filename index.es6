@@ -26,6 +26,10 @@ class FSSyncer extends EventEmitter {
       throw new Error("Glob cannot be an absolute path. Use cwd option to set the base directory.");
     }
 
+    if (!dest) {
+      throw new Error("A destination must be specified!");
+    }
+
     opts = defaults(opts || {}, DEFAULT_OPTS);
     this._cwd = opts.cwd || ".";
     this._dest = dest;
@@ -34,12 +38,6 @@ class FSSyncer extends EventEmitter {
     this._preserveDirTimestamps = includes(["all", "dir"], opts.preserveTimestamps);
 
     this._delete = opts.delete;
-    this._visited = new Set();
-
-    if (!dest) {
-      throw new Error("A destination must be specified!");
-    }
-    fs.ensureDirSync(dest);
 
     // Have we hit the ready state?
     this._ready = false;
@@ -48,12 +46,8 @@ class FSSyncer extends EventEmitter {
     this._postReadyFunctions = [];
 
     if (this._delete === "all") {
-      // If we were tracking visited files before the "ready" event then we
-      // have the delete option enabled. Time to visit the destination and
-      // ensure we remove everything not visited. We do this synchronously
-      // to ensure we're in a consistent state when we get subsequent updates
-      // from Chokidar.
-      this._postReadyFunctions.push(() => this._deleteUnvisitedFiles());
+      // Simply remove everything from the dest dir before we get started.
+      fs.removeSync(dest);
     }
 
     this._watcher = chokidar.watch(glob, filterChokidarOptions(opts))
@@ -78,11 +72,6 @@ class FSSyncer extends EventEmitter {
   }
 
   _handleWatchEvent(event, filePath, stat) {
-    // If we're tracking visited files add filePath to the visited set.
-    if (!this._ready && event !== "unlink" && event !== "unlinkDir") {
-      this._visited.add(filePath);
-    }
-
     const srcPath = path.join(this._cwd, filePath);
     const destPath = path.join(this._dest, filePath);
     switch (event) {
@@ -125,24 +114,6 @@ class FSSyncer extends EventEmitter {
 
     this.emit(event, filePath, destPath, stat);
     this.emit("all", event, filePath, destPath, stat);
-  }
-
-  _deleteUnvisitedFiles() {
-    if (this._delete === "all") {
-      const visitStack = fs.readdirSync(this._dest);
-      while (visitStack.length) {
-        const f = visitStack.pop();
-        const qualifiedF = path.join(this._dest, f);
-        if (!this._visited.has(f)) {
-          // We did not visit this file so delete it.
-          fs.removeSync(qualifiedF);
-        } else if (fs.statSync(qualifiedF).isDirectory()) {
-          fs.readdirSync(qualifiedF).forEach(subfile => visitStack.push(path.join(f, subfile)));
-        }
-      }
-    }
-
-    delete this._visited;
   }
 }
 
