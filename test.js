@@ -181,6 +181,18 @@ describe("watchSync", function() {
     });
   });
 
+  it("uses the current directory if none is specified via `cwd`", function() {
+    process.chdir(srcDir);
+    createWatcher(".", destDir)
+      .on("ready", function() {
+        expectFileSynced("test.txt");
+        expectDirExists("sd1");
+        expectFileSynced(path.join("sd1", "test.json"));
+        expectDirExists(path.join("sd1", "sd1-1"));
+        done();
+      });
+  });
+
   it("does not allow globs with absolute paths", function() {
     expect(function() {
       createWatcher(path.resolve("."), destDir, { cwd: srcDir });
