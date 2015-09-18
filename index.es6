@@ -7,22 +7,14 @@ import "babel/polyfill";
 import { EventEmitter } from "events";
 import chokidar from "chokidar";
 import defaults from "lodash/object/defaults";
-import includes from "lodash/collection/includes";
 import fs from "fs-extra";
 import path from "path";
 
 const DEFAULT_OPTS = {
   persistent: true,
-  preserveTimestamps: "all",
-  delete: "none"
+  preserveTimestamps: false,
+  delete: false
 };
-
-const EVENT_MAP = new Map();
-EVENT_MAP.set("add", "add");
-EVENT_MAP.set("addDir", "add");
-EVENT_MAP.set("change", "change");
-EVENT_MAP.set("unlink", "delete");
-EVENT_MAP.set("unlinkDir", "delete");
 
 class FSSyncer extends EventEmitter {
   constructor(srcDir, destDir, opts) {
@@ -32,41 +24,48 @@ class FSSyncer extends EventEmitter {
     this._srcDir = srcDir;
     this._destDir = destDir;
 
-    this._preserveFileTimestamps = includes(["all", "file"], opts.preserveTimestamps);
-    this._preserveDirTimestamps = includes(["all", "dir"], opts.preserveTimestamps);
-
     // Have we hit the ready state?
     this._ready = false;
 
-    // Functions to execute after we hit the ready state.
-    this._postReadyFunctions = [];
+    this._delete = opts.delete;
 
-    this._delete = includes(["after-ready", "all"], opts.delete);
-    if (opts.delete === "all") {
-      // Simply remove everything from the dest dir before we get started.
-      fs.removeSync(destDir);
-    }
+    this._copyOpts = {
+      preserveTimestamps: opts.preserveTimestamps
+    };
 
     const globs = opts.glob || ".";
     const chokidarOpts = {
       cwd: srcDir,
-      persistent: opts.persistent
+      persistent: opts.persistent,
+      ignoreInitial: true
     };
 
     this._watcher = chokidar.watch(globs, chokidarOpts)
-      .on("all", (e, p, s) => this._handleWatchEvent(e, p, s))
       .on("error", e => this._handleError(e))
       .on("ready", () => this._handleReady());
   }
 
+  get ready() {
+    return this._ready;
+  }
+
+  get srcDir() {
+    return this._srcDir;
+  }
+
+  get destDir() {
+    return this._destDir;
+  }
+
   close() {
     this._watcher.close();
+    this.removeAllListeners();
   }
 
   _handleReady() {
+    fs.copySync(this._srcDir, this._destDir, this._copyOpts);
     this._ready = true;
-    this._postReadyFunctions.forEach(fn => fn());
-    delete this._postReadyFunctions;
+    this._watcher.on("all", (e, p, s) => this._handleWatchEvent(e, p, s));
     this.emit("ready");
   }
 
@@ -89,21 +88,12 @@ class FSSyncer extends EventEmitter {
     switch (event) {
       case "add":
       case "change":
-        fs.copySync(srcPath, destPath, { preserveTimestamps: this._preserveFileTimestamps });
+        fs.copySync(srcPath, destPath, this._copyOpts);
         break;
       case "addDir":
         fs.ensureDirSync(destPath);
-        if (this._preserveDirTimestamps) {
-          const updateTimes = () => fs.utimesSync(destPath, stat.atime, stat.mtime);
-          if (this._ready) {
-            updateTimes();
-          } else {
-            // If we're not in the ready state then we defer updating the times
-            // for the directory. If we update immediately then it is possible
-            // that some other change to the directory (e.g. adding a file)
-            // will change its modify time.
-            this._postReadyFunctions.push(updateTimes);
-          }
+        if (this._preserveTimestamps) {
+          fs.utimesSync(destPath, stat.atime, stat.mtime);
         }
         break;
       case "unlink":
@@ -116,15 +106,12 @@ class FSSyncer extends EventEmitter {
         break;
     }
 
-    const mappedEvent = EVENT_MAP.get(event);
-    if (mappedEvent) {
-      if (stat) {
-        this.emit(mappedEvent, filePath, this._destDir, stat);
-        this.emit("all", mappedEvent, filePath, this._destDir, stat);
-      } else {
-        this.emit(mappedEvent, filePath, this._destDir);
-        this.emit("all", mappedEvent, filePath, this._destDir);
-      }
+    if (stat) {
+      this.emit(event, filePath, this._destDir, stat);
+      this.emit("all", event, filePath, this._destDir, stat);
+    } else {
+      this.emit(event, filePath, this._destDir);
+      this.emit("all", event, filePath, this._destDir);
     }
   }
 }
@@ -133,6 +120,6 @@ function watchSync(glob, dest, opts) {
   return new FSSyncer(glob, dest, opts);
 }
 // Read version in from package.json
-watchSync.version = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).version;
+watchSync.version = require("./package.json").version;
 
 export default watchSync;

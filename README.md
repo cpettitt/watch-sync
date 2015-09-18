@@ -5,11 +5,6 @@ Watch for file changes and replicate them to a new location.
 Performs initial synchronization between the src and dest directories and then
 sets a watcher that updates the dest directory any time a change is made.
 
-The watcher also produces events in the style of
-[sane](https://github.com/amasad/sane), with the exception that the initial
-sync (before ready) builds up a snapshot with incremental `add`, `change`, and
-`delete` events.
-
 ## Getting Started
 
 Install `watch-sync` via `NPM`:
@@ -57,28 +52,19 @@ initial sync. You can close the watcher with `watcher.close()`.
 - `persistent` (default: `true`). If `true` continue to watch the srcDir for
   changes after the initial sync. To close a persistent watcher use
   `watcher.close()`.
-- `delete` (default: `"none"`).  If `"none"` never delete an object from the
-  dest dir. If `"after-ready"` only delete objects that are removed after the
-  "ready" event has been fired. If `"all"` delete all objects not in the src
-  dir during initial sync and then delete all files removed after the "ready"
-  event has fired. If `"all"` delete files during the initial sync that are
-  in `destDir` but not in `srcDir`. After initial sync delete files from
-  `destDir` as they are removed from `srcDir`.
-- `preserveTimestamps` (default: `"all"`). If enabled sets the `atime` and
-  `mtime` for synchronized files to their source; otherwise `atime` and `mtime`
-  reflect the creation of the destination object (file or directory). Use
-  `preserveTimestamps = "file"` to enable this for files. Use
-  `preserveTimestamps = "dir"` to enable this for directories. Use
-  `preserveTimestamps = "all"` to enable this for both files and directories.
-  Use `preserveTimestamps = "non"` to disable this feature.
+- `delete` (default: `false`). When `true` a delete of a file in `srcDir` after
+  the `ready` event will cause the associated file in `destDir` to be removed.
+- `preserveTimestamps` (default: `false`). If enabled sets the modified time
+  of synchronized files to the modified time of the source file.
 
 #### Events
 
-- `ready` is fired after the initial sync of the file system. The initial sync
-  occurs as `add`, `change`, and `delete` events as described below.
-- `add` is fired when a file or directory is added.
-- `change` is fired when a file or directory is changed.
-- `delete` is fired when a file or directory is removed.
+- `ready` is fired after the initial sync of the file system.
+- `add` is fired when a file or directory is added. This is only fired after `ready`.
+- `change` is fired when a file or directory is changed. This is only fired
+  after `ready`.
+- `delete` is fired when a file or directory is removed. This is only fired
+  after `ready`.
 
 ### `watchSync.version()`
 
