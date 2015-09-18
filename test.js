@@ -9,21 +9,21 @@ var watchSync = require("./");
 describe("watchSync", function() {
   var initialDir = process.cwd();
   var tempRoot;
-  var srcDir;
-  var destDir;
+  var testSrcDir;
+  var testDestDir;
   var createdWatchers;
 
   beforeEach(function(done) {
     tempRoot = temp.mkdirSync();
-    srcDir = path.join(tempRoot, "src");
-    fs.copySync("test-fs", srcDir);
+    testSrcDir = path.join(tempRoot, "src");
+    fs.copySync("test-fs", testSrcDir);
 
     // We want test-fd/sd1/sd1-1 to be empty, but git doesn't track empty
-    // directories, so we delete a dummy file after copying it to `srcDir`.
-    fs.unlinkSync(path.join(srcDir, "sd1", "sd1-1", "README"));
+    // directories, so we delete a dummy file after copying it to `testSrcDir`.
+    fs.unlinkSync(path.join(testSrcDir, "sd1", "sd1-1", "README"));
 
-    destDir = path.join(tempRoot, "dest");
-    fs.mkdirsSync(destDir);
+    testDestDir = path.join(tempRoot, "dest");
+    fs.mkdirsSync(testDestDir);
     createdWatchers = [];
 
     // I've observed an apparent race occassionally on OSX where we copy the
@@ -43,7 +43,7 @@ describe("watchSync", function() {
 
   describe("before ready", function() {
     it("copies initial structure from src to dest", function(done) {
-      createWatcher(srcDir, destDir)
+      createWatcher(testSrcDir, testDestDir)
         .on("ready", function() {
           expectFileSynced("test.txt");
           expectDirExists("sd1");
@@ -58,14 +58,14 @@ describe("watchSync", function() {
       var fileToDelete;
 
       beforeEach(function() {
-        dirToDelete = path.join(destDir, "delete-me-dir");
+        dirToDelete = path.join(testDestDir, "delete-me-dir");
         fs.mkdirsSync(dirToDelete);
-        fileToDelete = path.join(destDir, "delete-me-file");
+        fileToDelete = path.join(testDestDir, "delete-me-file");
         fs.writeJsonSync(fileToDelete);
       });
 
       it("happens if delete='all'", function(done) {
-        createWatcher(srcDir, destDir, { delete: "all" })
+        createWatcher(testSrcDir, testDestDir, { delete: "all" })
           .on("ready", function() {
             expectNotExists("delete-me-dir");
             expectNotExists("delete-me-file");
@@ -74,7 +74,7 @@ describe("watchSync", function() {
       });
 
       it("does not happen if delete='after-ready'", function(done) {
-        createWatcher(srcDir, destDir, { delete: "after-ready" })
+        createWatcher(testSrcDir, testDestDir, { delete: "after-ready" })
           .on("ready", function() {
             expectDirExists("delete-me-dir");
             expectFileExists("delete-me-file");
@@ -83,7 +83,7 @@ describe("watchSync", function() {
       });
 
       it("does not happen if delete='none'", function(done) {
-        createWatcher(srcDir, destDir, { delete: "none" })
+        createWatcher(testSrcDir, testDestDir, { delete: "none" })
           .on("ready", function() {
             expectDirExists("delete-me-dir");
             expectFileExists("delete-me-file");
@@ -96,82 +96,87 @@ describe("watchSync", function() {
   describe("after ready", function() {
     it("copies new files from src to dest", function(done) {
       var newFile = "new-file";
-      createWatcher(srcDir, destDir)
+      createWatcher(testSrcDir, testDestDir)
         .on("ready", function() {
-          this.on("add", function(filePath, destPath) {
-            expect(filePath).equals(newFile);
-            expect(destPath).equals(path.join(destDir, newFile));
+          this.on("add", function(filePath, destDir, stat) {
             expectFileSynced(newFile);
+            expect(filePath).equals(newFile);
+            expect(destDir).equals(testDestDir);
+            expect(stat.isFile()).to.be.true;
             done();
           });
-          fs.writeJsonSync(path.join(srcDir, newFile), { json: "sure!" });
+          fs.writeJsonSync(path.join(testSrcDir, newFile), { json: "sure!" });
         });
     });
 
     it("copies new directories from src to dest", function(done) {
       var newDir = "new-dir";
-      createWatcher(srcDir, destDir)
+      createWatcher(testSrcDir, testDestDir)
         .on("ready", function() {
-          this.on("addDir", function(filePath, destPath) {
-            expect(filePath).equals(newDir);
-            expect(destPath).equals(path.join(destDir, newDir));
+          this.on("add", function(filePath, destDir, stat) {
             expectDirExists(newDir);
+            expect(filePath).equals(newDir);
+            expect(destDir).equals(testDestDir);
+            expect(stat.isDirectory()).to.be.true;
             done();
           });
-          fs.mkdirSync(path.join(srcDir, newDir));
+          fs.mkdirSync(path.join(testSrcDir, newDir));
         });
     });
 
     it("copies changed files from src to dest", function(done) {
       var file = "test.txt";
-      createWatcher(srcDir, destDir)
+      createWatcher(testSrcDir, testDestDir)
         .on("ready", function() {
-          this.on("change", function(filePath, destPath) {
-            expect(filePath).equals(file);
-            expect(destPath).equals(path.join(destDir, file));
+          this.on("change", function(filePath, destDir, stat) {
             expectFileSynced(file);
+            expect(filePath).equals(file);
+            expect(destDir).equals(testDestDir);
+            expect(stat.isFile()).to.be.true;
             done();
           });
-          fs.writeFileSync(path.join(srcDir, file), "New Content!");
+          fs.writeFileSync(path.join(testSrcDir, file), "New Content!");
         });
     });
 
     it("deletes file if delete='all'", function(done) {
       var file = "test.txt";
-      createWatcher(srcDir, destDir, { delete: "all" })
+      createWatcher(testSrcDir, testDestDir, { delete: "all" })
         .on("ready", function() {
-          this.on("unlink", function(filePath, destPath) {
-            expect(filePath).equals(file);
-            expect(destPath).equals(path.join(destDir, file));
+          this.on("delete", function(filePath, destDir) {
             expectNotExists(file);
+            expect(filePath).equals(file);
+            expect(destDir).equals(testDestDir);
+            expect(arguments).to.have.length(2);
             done();
           });
-          fs.unlinkSync(path.join(srcDir, file));
+          fs.unlinkSync(path.join(testSrcDir, file));
         });
     });
 
     it("deletes file if delete='after-ready'", function(done) {
       var file = "test.txt";
-      createWatcher(srcDir, destDir, { delete: "after-ready" })
+      createWatcher(testSrcDir, testDestDir, { delete: "after-ready" })
         .on("ready", function() {
-          this.on("unlink", function(filePath, destPath) {
-            expect(filePath).equals(file);
-            expect(destPath).equals(path.join(destDir, file));
+          this.on("delete", function(filePath, destDir) {
             expectNotExists(file);
+            expect(filePath).equals(file);
+            expect(destDir).equals(testDestDir);
+            expect(arguments).to.have.length(2);
             done();
           });
-          fs.unlinkSync(path.join(srcDir, file));
+          fs.unlinkSync(path.join(testSrcDir, file));
         });
     });
 
     it("does not delete files if delete='none'", function(done) {
       var file = "test.txt";
-      createWatcher(srcDir, destDir, { delete: "none" })
+      createWatcher(testSrcDir, testDestDir, { delete: "none" })
         .on("ready", function() {
-          this.on("unlink", function(filePath, destPath) {
+          this.on("delete", function() {
             throw new Error("Received unlink event - should not have deleted file");
           });
-          fs.unlinkSync(path.join(srcDir, file));
+          fs.unlinkSync(path.join(testSrcDir, file));
           setTimeout(function() {
             expectFileExists(file);
             done();
@@ -181,26 +186,26 @@ describe("watchSync", function() {
 
     it("deletes directories if delete='all'", function(done) {
       var dir = path.join("sd1", "sd1-1");
-      createWatcher(srcDir, destDir, { delete: "all" })
+      createWatcher(testSrcDir, testDestDir, { delete: "all" })
         .on("ready", function() {
-          this.on("unlinkDir", function(filePath, destPath) {
-            expect(filePath).equals(dir);
-            expect(destPath).equals(path.join(destDir, dir));
+          this.on("delete", function(filePath, destDir) {
             expectNotExists(dir);
+            expect(filePath).equals(dir);
+            expect(destDir).equals(testDestDir);
             done();
           });
-          fs.rmdirSync(path.join(srcDir, dir));
+          fs.rmdirSync(path.join(testSrcDir, dir));
         });
     });
 
     it("does not delete directories if delete='none'", function(done) {
       var dir = path.join("sd1", "sd1-1");
-      createWatcher(srcDir, destDir, { delete: "none" })
+      createWatcher(testSrcDir, testDestDir, { delete: "none" })
         .on("ready", function() {
-          this.on("unlinkDir", function(filePath, destPath) {
+          this.on("delete", function() {
             throw new Error("Received unlinkDir event - should not have deleted directory");
           });
-          fs.rmdirSync(path.join(srcDir, dir));
+          fs.rmdirSync(path.join(testSrcDir, dir));
           setTimeout(function() {
             expectDirExists(dir);
             done();
@@ -235,12 +240,12 @@ describe("watchSync", function() {
     function preserveFileTimestamps(preserveTimestamps, does) {
       it("does" + (does ? "" : "n't") + " preserve file timestamps", function(done) {
         var file = "test.txt";
-        var srcFile = path.join(srcDir, file);
-        var destFile = path.join(destDir, file);
+        var srcFile = path.join(testSrcDir, file);
+        var destFile = path.join(testDestDir, file);
 
         fs.utimesSync(srcFile, yesterday, yesterday);
 
-        createWatcher(srcDir, destDir, { preserveTimestamps: preserveTimestamps })
+        createWatcher(testSrcDir, testDestDir, { preserveTimestamps: preserveTimestamps })
           .on("ready", function() {
             var expectation = expect(fs.statSync(destFile).mtime.getTime());
             if (!does) {
@@ -255,12 +260,12 @@ describe("watchSync", function() {
     function preserveDirTimestamps(preserveTimestamps, does) {
       it("does" + (does ? "" : "n't") + " preserve directory timestamps", function(done) {
         var dir = "sd1";
-        var src  = path.join(srcDir, dir);
-        var dest  = path.join(destDir, dir);
+        var src  = path.join(testSrcDir, dir);
+        var dest  = path.join(testDestDir, dir);
 
         fs.utimesSync(src, yesterday, yesterday);
 
-        createWatcher(srcDir, destDir, { preserveTimestamps: preserveTimestamps })
+        createWatcher(testSrcDir, testDestDir, { preserveTimestamps: preserveTimestamps })
           .on("ready", function() {
             var expectation = expect(fs.statSync(dest).mtime.getTime());
             if (!does) {
@@ -280,23 +285,23 @@ describe("watchSync", function() {
   function expectFileSynced(relativePath) {
     expectFileExists(relativePath);
 
-    var srcFile = path.join(srcDir, relativePath);
-    var destFile = path.join(destDir, relativePath);
+    var srcFile = path.join(testSrcDir, relativePath);
+    var destFile = path.join(testDestDir, relativePath);
     expect(readFile(destFile)).equals(readFile(srcFile));
   }
 
   function expectFileExists(relativePath) {
-    var destFile = path.join(destDir, relativePath);
+    var destFile = path.join(testDestDir, relativePath);
     expect(fs.statSync(destFile).isFile()).is.true;
   }
 
   function expectDirExists(relativePath) {
-    expect(fs.statSync(path.join(destDir, relativePath)).isDirectory()).is.true;
+    expect(fs.statSync(path.join(testDestDir, relativePath)).isDirectory()).is.true;
   }
 
   function expectNotExists(relativePath) {
     expect(function() {
-      fs.statSync(path.join(destDir, relativePath));
+      fs.statSync(path.join(testDestDir, relativePath));
     }).to.throw();
   }
 

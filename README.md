@@ -5,6 +5,11 @@ Watch for file changes and replicate them to a new location.
 Performs initial synchronization between the src and dest directories and then
 sets a watcher that updates the dest directory any time a change is made.
 
+The watcher also produces events in the style of
+[sane](https://github.com/amasad/sane), with the exception that the initial
+sync (before ready) builds up a snapshot with incremental `add`, `change`, and
+`delete` events.
+
 ## Getting Started
 
 Install `watch-sync` via `NPM`:
@@ -22,6 +27,16 @@ var srcDir = ".";
 var destDir = "/tmp/watchSync";
 var options = {};
 var watcher = watchSync(srcDir, destDir, options);
+watcher.on("ready", function() { console.log("ready"); });
+watcher.on("add", function(filepath, destDir, stat) {
+  console.log("File / directory added", filepath, "in", destDir);
+});
+watcher.on("change", function(filepath, destDir, stat) {
+  console.log("File / directory changed", filepath, "in", destDir);
+});
+watcher.on("delete", function(filepath, destDir) {
+  console.log("File / directory removed", filepath, "from", destDir);
+});
 ```
 
 By default watchSync is persistent, which means it will run even after the
@@ -56,6 +71,14 @@ initial sync. You can close the watcher with `watcher.close()`.
   `preserveTimestamps = "dir"` to enable this for directories. Use
   `preserveTimestamps = "all"` to enable this for both files and directories.
   Use `preserveTimestamps = "non"` to disable this feature.
+
+#### Events
+
+- `ready` is fired after the initial sync of the file system. The initial sync
+  occurs as `add`, `change`, and `delete` events as described below.
+- `add` is fired when a file or directory is added.
+- `change` is fired when a file or directory is changed.
+- `delete` is fired when a file or directory is removed.
 
 ### `watchSync.version()`
 

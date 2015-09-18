@@ -17,6 +17,13 @@ const DEFAULT_OPTS = {
   delete: "none"
 };
 
+const EVENT_MAP = new Map();
+EVENT_MAP.set("add", "add");
+EVENT_MAP.set("addDir", "add");
+EVENT_MAP.set("change", "change");
+EVENT_MAP.set("unlink", "delete");
+EVENT_MAP.set("unlinkDir", "delete");
+
 class FSSyncer extends EventEmitter {
   constructor(srcDir, destDir, opts) {
     super();
@@ -70,6 +77,15 @@ class FSSyncer extends EventEmitter {
   _handleWatchEvent(event, filePath, stat) {
     const srcPath = path.join(this._srcDir, filePath);
     const destPath = path.join(this._destDir, filePath);
+
+    if (!stat && event !== "unlink" && event !== "unlinkDir") {
+      // Chokidar only sends stats if it gets them from the underlying
+      // watch events. I tried using Chokidar's `alwaysStat` option but it
+      // appeared to break some watches, so instead we stat here.
+      // TODO investigate why always stat is breaking watches.
+      stat = fs.statSync(srcPath);
+    }
+
     switch (event) {
       case "add":
       case "change":
@@ -78,14 +94,6 @@ class FSSyncer extends EventEmitter {
       case "addDir":
         fs.ensureDirSync(destPath);
         if (this._preserveDirTimestamps) {
-          if (!stat) {
-            // Chokidar only sends stats if it gets them from the underlying
-            // watch events. We don't want to force stats if we don't need
-            // them, so we do not use Chokidar's `alwaysStat` option. Instead
-            // we stat here if needed.
-            stat = fs.statSync(srcPath);
-          }
-
           const updateTimes = () => fs.utimesSync(destPath, stat.atime, stat.mtime);
           if (this._ready) {
             updateTimes();
@@ -108,8 +116,16 @@ class FSSyncer extends EventEmitter {
         break;
     }
 
-    this.emit(event, filePath, destPath, stat);
-    this.emit("all", event, filePath, destPath, stat);
+    const mappedEvent = EVENT_MAP.get(event);
+    if (mappedEvent) {
+      if (stat) {
+        this.emit(mappedEvent, filePath, this._destDir, stat);
+        this.emit("all", mappedEvent, filePath, this._destDir, stat);
+      } else {
+        this.emit(mappedEvent, filePath, this._destDir);
+        this.emit("all", mappedEvent, filePath, this._destDir);
+      }
+    }
   }
 }
 
