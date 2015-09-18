@@ -18,10 +18,10 @@ Then require it to use it:
 ```js
 var watchSync = require("watch-sync");
 
-var srcGlob = ".";
+var srcDir = ".";
 var destDir = "/tmp/watchSync";
 var options = {};
-var watcher = watchSync(srcGlob, destDir, options);
+var watcher = watchSync(srcDir, destDir, options);
 ```
 
 By default watchSync is persistent, which means it will run even after the
@@ -29,9 +29,9 @@ initial sync. You can close the watcher with `watcher.close()`.
 
 ## API
 
-### `watchSync(srcGlob, destDir, [options])`
+### `watchSync(srcDir, destDir, [options])`
 
-- `srcGlob` is the source glob to watch.
+- `srcDir` is the source directory to watch.
 - `destDir` is the path to the destination directory. The directory will be
   created if it does not already exist.
 - `options` is an optional set of configuration entries, as described in the
@@ -39,7 +39,7 @@ initial sync. You can close the watcher with `watcher.close()`.
 
 #### Options
 
-- `persistent` (default: `true`). If `true` continue to watch the srcGlob for
+- `persistent` (default: `true`). If `true` continue to watch the srcDir for
   changes after the initial sync. To close a persistent watcher use
   `watcher.close()`.
 - `delete` (default: `"none"`).  If `"none"` never delete an object from the
@@ -47,10 +47,8 @@ initial sync. You can close the watcher with `watcher.close()`.
   "ready" event has been fired. If `"all"` delete all objects not in the src
   dir during initial sync and then delete all files removed after the "ready"
   event has fired. If `"all"` delete files during the initial sync that are
-  in `destDir` but not in `srcGlob`. After initial sync delete files from
-  `destDir` as they are removed from `srcGlob`.
-- `cwd` (default: `.`). Use the `cwd` directory as the base directory on which
-  to apply the `srcGlob`.
+  in `destDir` but not in `srcDir`. After initial sync delete files from
+  `destDir` as they are removed from `srcDir`.
 - `preserveTimestamps` (default: `"all"`). If enabled sets the `atime` and
   `mtime` for synchronized files to their source; otherwise `atime` and `mtime`
   reflect the creation of the destination object (file or directory). Use

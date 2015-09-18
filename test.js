@@ -43,7 +43,7 @@ describe("watchSync", function() {
 
   describe("before ready", function() {
     it("copies initial structure from src to dest", function(done) {
-      createWatcher(".", destDir, { cwd: srcDir })
+      createWatcher(srcDir, destDir)
         .on("ready", function() {
           expectFileSynced("test.txt");
           expectDirExists("sd1");
@@ -65,7 +65,7 @@ describe("watchSync", function() {
       });
 
       it("happens if delete='all'", function(done) {
-        createWatcher(".", destDir, { cwd: srcDir, delete: "all" })
+        createWatcher(srcDir, destDir, { delete: "all" })
           .on("ready", function() {
             expectNotExists("delete-me-dir");
             expectNotExists("delete-me-file");
@@ -74,7 +74,7 @@ describe("watchSync", function() {
       });
 
       it("does not happen if delete='after-ready'", function(done) {
-        createWatcher(".", destDir, { cwd: srcDir, delete: "after-ready" })
+        createWatcher(srcDir, destDir, { delete: "after-ready" })
           .on("ready", function() {
             expectDirExists("delete-me-dir");
             expectFileExists("delete-me-file");
@@ -83,7 +83,7 @@ describe("watchSync", function() {
       });
 
       it("does not happen if delete='none'", function(done) {
-        createWatcher(".", destDir, { cwd: srcDir, delete: "none" })
+        createWatcher(srcDir, destDir, { delete: "none" })
           .on("ready", function() {
             expectDirExists("delete-me-dir");
             expectFileExists("delete-me-file");
@@ -96,7 +96,7 @@ describe("watchSync", function() {
   describe("after ready", function() {
     it("copies new files from src to dest", function(done) {
       var newFile = "new-file";
-      createWatcher(".", destDir, { cwd: srcDir })
+      createWatcher(srcDir, destDir)
         .on("ready", function() {
           this.on("add", function(filePath, destPath) {
             expect(filePath).equals(newFile);
@@ -110,7 +110,7 @@ describe("watchSync", function() {
 
     it("copies new directories from src to dest", function(done) {
       var newDir = "new-dir";
-      createWatcher(".", destDir, { cwd: srcDir })
+      createWatcher(srcDir, destDir)
         .on("ready", function() {
           this.on("addDir", function(filePath, destPath) {
             expect(filePath).equals(newDir);
@@ -124,7 +124,7 @@ describe("watchSync", function() {
 
     it("copies changed files from src to dest", function(done) {
       var file = "test.txt";
-      createWatcher(".", destDir, { cwd: srcDir })
+      createWatcher(srcDir, destDir)
         .on("ready", function() {
           this.on("change", function(filePath, destPath) {
             expect(filePath).equals(file);
@@ -138,7 +138,7 @@ describe("watchSync", function() {
 
     it("deletes file if delete='all'", function(done) {
       var file = "test.txt";
-      createWatcher(".", destDir, { cwd: srcDir, delete: "all" })
+      createWatcher(srcDir, destDir, { delete: "all" })
         .on("ready", function() {
           this.on("unlink", function(filePath, destPath) {
             expect(filePath).equals(file);
@@ -152,7 +152,7 @@ describe("watchSync", function() {
 
     it("deletes file if delete='after-ready'", function(done) {
       var file = "test.txt";
-      createWatcher(".", destDir, { cwd: srcDir, delete: "after-ready" })
+      createWatcher(srcDir, destDir, { delete: "after-ready" })
         .on("ready", function() {
           this.on("unlink", function(filePath, destPath) {
             expect(filePath).equals(file);
@@ -166,7 +166,7 @@ describe("watchSync", function() {
 
     it("does not delete files if delete='none'", function(done) {
       var file = "test.txt";
-      createWatcher(".", destDir, { cwd: srcDir, delete: "none" })
+      createWatcher(srcDir, destDir, { delete: "none" })
         .on("ready", function() {
           this.on("unlink", function(filePath, destPath) {
             throw new Error("Received unlink event - should not have deleted file");
@@ -181,7 +181,7 @@ describe("watchSync", function() {
 
     it("deletes directories if delete='all'", function(done) {
       var dir = path.join("sd1", "sd1-1");
-      createWatcher(".", destDir, { cwd: srcDir, delete: "all" })
+      createWatcher(srcDir, destDir, { delete: "all" })
         .on("ready", function() {
           this.on("unlinkDir", function(filePath, destPath) {
             expect(filePath).equals(dir);
@@ -195,7 +195,7 @@ describe("watchSync", function() {
 
     it("does not delete directories if delete='none'", function(done) {
       var dir = path.join("sd1", "sd1-1");
-      createWatcher(".", destDir, { cwd: srcDir, delete: "none" })
+      createWatcher(srcDir, destDir, { delete: "none" })
         .on("ready", function() {
           this.on("unlinkDir", function(filePath, destPath) {
             throw new Error("Received unlinkDir event - should not have deleted directory");
@@ -207,24 +207,6 @@ describe("watchSync", function() {
           }, 200);
         });
     });
-  });
-
-  it("uses the current directory if none is specified via `cwd`", function() {
-    process.chdir(srcDir);
-    createWatcher(".", destDir)
-      .on("ready", function() {
-        expectFileSynced("test.txt");
-        expectDirExists("sd1");
-        expectFileSynced(path.join("sd1", "test.json"));
-        expectDirExists(path.join("sd1", "sd1-1"));
-        done();
-      });
-  });
-
-  it("does not allow globs with absolute paths", function() {
-    expect(function() {
-      createWatcher(path.resolve("."), destDir, { cwd: srcDir });
-    }).to.throw();
   });
 
   describe("preserveTimestamps", function() {
@@ -258,7 +240,7 @@ describe("watchSync", function() {
 
         fs.utimesSync(srcFile, yesterday, yesterday);
 
-        createWatcher(".", destDir, { cwd: srcDir, preserveTimestamps: preserveTimestamps })
+        createWatcher(srcDir, destDir, { preserveTimestamps: preserveTimestamps })
           .on("ready", function() {
             var expectation = expect(fs.statSync(destFile).mtime.getTime());
             if (!does) {
@@ -278,7 +260,7 @@ describe("watchSync", function() {
 
         fs.utimesSync(src, yesterday, yesterday);
 
-        createWatcher(".", destDir, { cwd: srcDir, preserveTimestamps: preserveTimestamps })
+        createWatcher(srcDir, destDir, { preserveTimestamps: preserveTimestamps })
           .on("ready", function() {
             var expectation = expect(fs.statSync(dest).mtime.getTime());
             if (!does) {

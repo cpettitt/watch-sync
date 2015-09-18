@@ -9,30 +9,21 @@ import chokidar from "chokidar";
 import defaults from "lodash/object/defaults";
 import includes from "lodash/collection/includes";
 import fs from "fs-extra";
-import isAbsolute from "path-is-absolute";
 import path from "path";
-import pick from "lodash/object/pick";
 
 const DEFAULT_OPTS = {
+  persistent: true,
   preserveTimestamps: "all",
   delete: "none"
 };
 
 class FSSyncer extends EventEmitter {
-  constructor(glob, dest, opts) {
+  constructor(srcDir, destDir, opts) {
     super();
 
-    if (isAbsolute(glob)) {
-      throw new Error("Glob cannot be an absolute path. Use cwd option to set the base directory.");
-    }
-
-    if (!dest) {
-      throw new Error("A destination must be specified!");
-    }
-
     opts = defaults(opts || {}, DEFAULT_OPTS);
-    this._cwd = opts.cwd || ".";
-    this._dest = dest;
+    this._srcDir = srcDir;
+    this._destDir = destDir;
 
     this._preserveFileTimestamps = includes(["all", "file"], opts.preserveTimestamps);
     this._preserveDirTimestamps = includes(["all", "dir"], opts.preserveTimestamps);
@@ -46,10 +37,16 @@ class FSSyncer extends EventEmitter {
     this._delete = includes(["after-ready", "all"], opts.delete);
     if (opts.delete === "all") {
       // Simply remove everything from the dest dir before we get started.
-      fs.removeSync(dest);
+      fs.removeSync(destDir);
     }
 
-    this._watcher = chokidar.watch(glob, filterChokidarOptions(opts))
+    const globs = opts.glob || ".";
+    const chokidarOpts = {
+      cwd: srcDir,
+      persistent: opts.persistent
+    };
+
+    this._watcher = chokidar.watch(globs, chokidarOpts)
       .on("all", (e, p, s) => this._handleWatchEvent(e, p, s))
       .on("error", e => this._handleError(e))
       .on("ready", () => this._handleReady());
@@ -71,8 +68,8 @@ class FSSyncer extends EventEmitter {
   }
 
   _handleWatchEvent(event, filePath, stat) {
-    const srcPath = path.join(this._cwd, filePath);
-    const destPath = path.join(this._dest, filePath);
+    const srcPath = path.join(this._srcDir, filePath);
+    const destPath = path.join(this._destDir, filePath);
     switch (event) {
       case "add":
       case "change":
@@ -121,14 +118,5 @@ function watchSync(glob, dest, opts) {
 }
 // Read version in from package.json
 watchSync.version = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).version;
-
-function filterChokidarOptions(opts) {
-  return pick(opts, [
-    "cwd",
-    "depth",
-    "ignored",
-    "persistent",
-  ]);
-}
 
 export default watchSync;
