@@ -3,10 +3,10 @@
 var expect = require("chai").expect;
 var fs = require("fs-extra");
 var path = require("path");
-var temp = require("temp");
 var watchSync = require("./");
 
 describe("watchSync", function() {
+  var nextId = 0;
   var tempRoot;
   var testSrcDir;
   var testDestDir;
@@ -14,7 +14,10 @@ describe("watchSync", function() {
   var yesterday = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
 
   beforeEach(function(done) {
-    tempRoot = temp.mkdirSync();
+    tempRoot = path.join("tmp", String(nextId++));
+    fs.removeSync(tempRoot);
+    fs.mkdirsSync(tempRoot);
+
     testSrcDir = path.join(tempRoot, "src");
     fs.copySync("test-fs", testSrcDir);
 
@@ -57,6 +60,16 @@ describe("watchSync", function() {
         expectDirExists("sd1");
         expectFileSynced(path.join("sd1", "test.json"));
         expectDirExists(path.join("sd1", "sd1-1"));
+        done();
+      });
+  });
+
+  it("only copies matching files during initial sync", function(done) {
+    createWatcher(testSrcDir, testDestDir, { glob: ["**/test.json"] })
+      .on("ready", function() {
+        expectNotExists("test.txt");
+        expectFileSynced(path.join("sd1", "test.json"));
+        expectNotExists(path.join("sd1", "sd1-1"));
         done();
       });
   });

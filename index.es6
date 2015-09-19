@@ -1,8 +1,10 @@
 // Get stack traces that point to the original ES6 code.
 import "source-map-support/register";
 
-// Include babel polyfill
-import "babel/polyfill";
+if (typeof _babelPolyfill === "undefined") {
+  // Include babel polyfill
+  require("babel/polyfill");
+}
 
 import { EventEmitter } from "events";
 import chokidar from "chokidar";
@@ -29,18 +31,19 @@ class FSSyncer extends EventEmitter {
 
     this._delete = opts.delete;
 
+    const globs = opts.glob || ".";
+
     this._copyOpts = {
       preserveTimestamps: opts.preserveTimestamps
     };
 
-    const globs = opts.glob || ".";
     const chokidarOpts = {
       cwd: srcDir,
-      persistent: opts.persistent,
-      ignoreInitial: true
+      persistent: opts.persistent
     };
 
     this._watcher = chokidar.watch(globs, chokidarOpts)
+      .on("all", (e, p, s) => this._handleWatchEvent(e, p, s))
       .on("error", e => this._handleError(e))
       .on("ready", () => this._handleReady());
   }
@@ -116,8 +119,8 @@ class FSSyncer extends EventEmitter {
   }
 }
 
-function watchSync(glob, dest, opts) {
-  return new FSSyncer(glob, dest, opts);
+function watchSync(src, dest, opts) {
+  return new FSSyncer(src, dest, opts);
 }
 // Read version in from package.json
 watchSync.version = require("./package.json").version;
