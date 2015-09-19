@@ -6,13 +6,15 @@ if (typeof _babelPolyfill === "undefined") {
   require("babel/polyfill");
 }
 
-import { EventEmitter } from "events";
 import chokidar from "chokidar";
 import defaults from "lodash/object/defaults";
 import fs from "fs-extra";
 import path from "path";
+import { EventEmitter } from "events";
+import { Logger } from "eazy-logger";
 
 const DEFAULT_OPTS = {
+  logLevel: "warning",
   persistent: true,
   preserveTimestamps: false,
   delete: false
@@ -25,6 +27,11 @@ class FSSyncer extends EventEmitter {
     opts = defaults(opts || {}, DEFAULT_OPTS);
     this._srcDir = srcDir;
     this._destDir = destDir;
+
+    this._logger = new Logger({
+      level: opts.logLevel,
+      prefix: "[{blue:watch-sync}] "
+    });
 
     // Have we hit the ready state?
     this._ready = false;
@@ -66,17 +73,20 @@ class FSSyncer extends EventEmitter {
   }
 
   _handleReady() {
-    fs.copySync(this._srcDir, this._destDir, this._copyOpts);
     this._ready = true;
-    this._watcher.on("all", (e, p, s) => this._handleWatchEvent(e, p, s));
+    this._logger.info("{cyan:Watching} {magenta:%s}", this._srcDir);
     this.emit("ready");
   }
 
   _handleError(e) {
+    this._logger.error("{red:Error: %s}", e);
     this.emit("error", e);
   }
 
   _handleWatchEvent(event, filePath, stat) {
+    if (!filePath.length) {
+      filePath = ".";
+    }
     const srcPath = path.join(this._srcDir, filePath);
     const destPath = path.join(this._destDir, filePath);
 
@@ -92,12 +102,11 @@ class FSSyncer extends EventEmitter {
       case "add":
       case "change":
         fs.copySync(srcPath, destPath, this._copyOpts);
+        this._logWatchEvent("copy", filePath);
         break;
       case "addDir":
         fs.ensureDirSync(destPath);
-        if (this._preserveTimestamps) {
-          fs.utimesSync(destPath, stat.atime, stat.mtime);
-        }
+        this._logWatchEvent("mkdir", filePath);
         break;
       case "unlink":
       case "unlinkDir":
@@ -106,6 +115,7 @@ class FSSyncer extends EventEmitter {
           return;
         }
         fs.removeSync(destPath);
+        this._logWatchEvent("rm", filePath);
         break;
     }
 
@@ -116,6 +126,15 @@ class FSSyncer extends EventEmitter {
       this.emit(event, filePath, this._destDir);
       this.emit("all", event, filePath, this._destDir);
     }
+  }
+
+  _logWatchEvent(type, filePath) {
+    this._logger.debug("{cyan:%s} {green:%s} ({magenta:%s} -> {magenta:%s})",
+        type,
+        filePath,
+        this._srcDir,
+        this._destDir
+    );
   }
 }
 
