@@ -1,5 +1,6 @@
 "use strict";
 
+var defaults = require("lodash/object/defaults");
 var expect = require("chai").expect;
 var fs = require("fs-extra");
 var path = require("path");
@@ -232,6 +233,7 @@ describe("watchSync", function() {
   }
 
   function createWatcher(srcDir, destDir, opts) {
+    opts = defaults(opts || {}, { logLevel: "off" });
     var watcher = watchSync(srcDir, destDir, opts);
     createdWatchers.push(watcher);
     return watcher;
