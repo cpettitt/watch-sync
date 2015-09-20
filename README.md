@@ -52,7 +52,7 @@ initial sync. You can close the watcher with `watcher.close()`.
 - `persistent` (default: `true`). If `true` continue to watch the srcDir for
   changes after the initial sync. To close a persistent watcher use
   `watcher.close()`.
-- `delete` (default: `false`). When `true` a delete of a file in `srcDir` after
+- `delete` (default: `true`). When `true` a delete of a file in `srcDir` after
   the `ready` event will cause the associated file in `destDir` to be removed.
 - `preserveTimestamps` (default: `false`). If enabled sets the modified time
   of synchronized files to the modified time of the source file.
