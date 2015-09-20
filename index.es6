@@ -17,7 +17,7 @@ const DEFAULT_OPTS = {
   logLevel: "warning",
   persistent: true,
   preserveTimestamps: false,
-  delete: false
+  delete: true
 };
 
 class FSSyncer extends EventEmitter {
