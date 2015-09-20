@@ -231,9 +231,8 @@ describe("watchSync", function() {
     }).to.throw();
   }
 
-  function createWatcher() {
-    var args = Array.prototype.slice.call(arguments);
-    var watcher = watchSync.apply(watchSync, args);
+  function createWatcher(srcDir, destDir, opts) {
+    var watcher = watchSync(srcDir, destDir, opts);
     createdWatchers.push(watcher);
     return watcher;
   }
