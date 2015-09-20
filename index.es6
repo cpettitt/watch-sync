@@ -102,11 +102,11 @@ class FSSyncer extends EventEmitter {
       case "add":
       case "change":
         fs.copySync(srcPath, destPath, this._copyOpts);
-        this._logWatchEvent("copy", filePath);
+        this._logger.debug("{cyan:Copy} {green:%s} -> {green:%s})", srcPath, destPath);
         break;
       case "addDir":
         fs.ensureDirSync(destPath);
-        this._logWatchEvent("mkdir", filePath);
+        this._logger.debug("{cyan:Make dir} {green:%s})", destPath);
         break;
       case "unlink":
       case "unlinkDir":
@@ -115,7 +115,7 @@ class FSSyncer extends EventEmitter {
           return;
         }
         fs.removeSync(destPath);
-        this._logWatchEvent("rm", filePath);
+        this._logger.debug("{cyan:Delete} {green:%s})", destPath);
         break;
     }
 
@@ -126,15 +126,6 @@ class FSSyncer extends EventEmitter {
       this.emit(event, filePath, this._destDir);
       this.emit("all", event, filePath, this._destDir);
     }
-  }
-
-  _logWatchEvent(type, filePath) {
-    this._logger.debug("{cyan:%s} {green:%s} ({magenta:%s} -> {magenta:%s})",
-        type,
-        filePath,
-        this._srcDir,
-        this._destDir
-    );
   }
 }
 
